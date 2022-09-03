@@ -1,0 +1,31 @@
+@import '@styles/_theme.scss';
+@import '@styles/_mixins.scss';
+
+html {
+  font-family: 'Ubuntu', 'Helvetica Neue', 'sans-serif';
+  @include smooth-font;
+  @include font-size-reset;
+  color: $textPrimary;
+  background-color: $colorBG;
+}
+
+body {
+  font-family: 'Ubuntu', 'Helvetica Neue', 'sans-serif';
+  @include smooth-font;
+  @include font-size-reset;
+  color: $textPrimary;
+  line-height: 1.6;
+  background-color: $colorBG;
+}
+
+a {
+  color: $colorPrimary;
+  text-decoration: none;
+}
+
+// markdown override
+div p img {
+  display: block;
+  margin: auto;
+  max-width: 75%;
+}
