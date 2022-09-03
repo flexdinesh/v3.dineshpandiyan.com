@@ -56,7 +56,9 @@ typings/
 
 # gatsby files
 .cache/
-public
+# this project is not maintained and will probably never build again in the future
+# so pushing build files one last time for static hosting
+# public
 
 # Mac files
 .DS_Store

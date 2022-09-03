@@ -1,0 +1,1163 @@
+<?xml version="1.0" encoding="UTF-8"?><rss xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:content="http://purl.org/rss/1.0/modules/content/" xmlns:atom="http://www.w3.org/2005/Atom" version="2.0"><channel><title><![CDATA[Web Dev]]></title><description><![CDATA[Dinesh Pandiyan is a JavaScript Engineer, international speaker, blogger and the author of a few popular open source projects.]]></description><link>https://dineshpandiyan.com</link><generator>GatsbyJS</generator><lastBuildDate>Sat, 03 Sep 2022 03:53:21 GMT</lastBuildDate><item><title><![CDATA[Progressive Rendering — The Key to Faster Web]]></title><link>https://dineshpandiyan.com/progressive-rendering/</link><guid isPermaLink="false">https://dineshpandiyan.com/progressive-rendering/</guid><pubDate>Mon, 11 Nov 2019 00:00:00 GMT</pubDate><content:encoded></content:encoded></item><item><title><![CDATA[React Dev Tools — Debug Like a Ninja]]></title><link>https://dineshpandiyan.com/react-dev-tool-debug-like-a-ninja/</link><guid isPermaLink="false">https://dineshpandiyan.com/react-dev-tool-debug-like-a-ninja/</guid><pubDate>Sat, 14 Sep 2019 00:00:00 GMT</pubDate><content:encoded></content:encoded></item><item><title><![CDATA[React — Access custom params in handlers the right way]]></title><link>https://dineshpandiyan.com/react-custom-params-in-handlers/</link><guid isPermaLink="false">https://dineshpandiyan.com/react-custom-params-in-handlers/</guid><pubDate>Thu, 06 Jun 2019 00:00:00 GMT</pubDate><content:encoded></content:encoded></item><item><title><![CDATA[Cache Busting a React App]]></title><description><![CDATA[This article is also cross-posted in — DEV - Cache Busting a React App TL;DR - SemVer your app and generate a meta.json file on each build…]]></description><link>https://dineshpandiyan.com/cache-busting/</link><guid isPermaLink="false">https://dineshpandiyan.com/cache-busting/</guid><pubDate>Sun, 14 Apr 2019 00:00:00 GMT</pubDate><content:encoded>&lt;p&gt;This article is also cross-posted in —&lt;/p&gt;
+&lt;p&gt;DEV - &lt;a href=&quot;https://dev.to/flexdinesh/cache-busting-a-react-app-22lk&quot;&gt;Cache Busting a React App&lt;/a&gt;&lt;/p&gt;
+&lt;hr&gt;
+&lt;p&gt;&lt;em&gt;&lt;strong&gt;TL;DR&lt;/strong&gt; - &lt;a href=&quot;https://docs.npmjs.com/about-semantic-versioning&quot;&gt;SemVer&lt;/a&gt; your app and generate a &lt;code&gt;meta.json&lt;/code&gt; file on each build that won&apos;t be cached by the browser. Invalidate cache and hard reload the app when there&apos;s a version mismatch.&lt;/em&gt;&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;&lt;em&gt;Note: The examples and explanations in this post are React based. But the strategy will work with any web application/framework.&lt;/em&gt;&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;As great as caching is — cache invalidation has been a struggle for a long time now. &lt;strong&gt;Invalidating&lt;/strong&gt; the &lt;strong&gt;cache&lt;/strong&gt; of a web app that&apos;s loaded in the browser &lt;strong&gt;is hard&lt;/strong&gt;. But &lt;strong&gt;invalidating&lt;/strong&gt; the &lt;strong&gt;cache&lt;/strong&gt; of a web app that&apos;s saved to the &lt;strong&gt;home screen&lt;/strong&gt; is &lt;strong&gt;even harder&lt;/strong&gt;. &lt;/p&gt;
+&lt;p&gt;A quick intro to caching —&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;Server caching:&lt;/strong&gt; Web servers cache the resources when they are requested for the first time. Second time onwards, the resources are served from the server cache. There&apos;s a lot more to this — CDN, origin servers, edge servers, etc but we&apos;ll not go into all that. Invalidating server cache is quite straight forward as we have control over our server and on each new deploy, we could either automatically or manually clear the old cache.&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;Browser caching:&lt;/strong&gt; Browsers also cache the resources in their own way. When a site is loaded for the first time in the user&apos;s browser, the browser decides to cache some resources (mostly assets like images, js and css) locally and the next time the user visits the same site, the browser serves the resources from the local cache. Since we don&apos;t have control over the user&apos;s browser, clearing cache in the user&apos;s browser has always been a bit of a struggle in the past. With cache headers and with build tools like webpack generating unique chunks on each build, it&apos;s a becoming a bit easier to manage, but still, it&apos;s not without pitfalls.&lt;/p&gt;
+&lt;p&gt;Here are some of the gotchas with browser caching —&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;&lt;strong&gt;Browsers&lt;/strong&gt; tend to &lt;strong&gt;ignore cache validation&lt;/strong&gt; some times if the site is refreshed in the &lt;strong&gt;same tab&lt;/strong&gt; — if the user pins the tab, there&apos;s a good chance the site will be loaded from browser cache even if the server cache is cleared. &lt;/li&gt;
+&lt;li&gt;If your app is registering a &lt;strong&gt;service-worker&lt;/strong&gt;, then the service worker &lt;strong&gt;cache&lt;/strong&gt; will be &lt;strong&gt;invalidated&lt;/strong&gt; only if the user opens the site in a &lt;strong&gt;new tab&lt;/strong&gt;. The user will be stuck with the service worker cache forever if the tab is never closed.&lt;/li&gt;
+&lt;li&gt;If the user &lt;strong&gt;adds&lt;/strong&gt; the site to &lt;strong&gt;home screen&lt;/strong&gt; in mobile/tablet, then the browser &lt;strong&gt;cache&lt;/strong&gt; will be &lt;strong&gt;invalidated&lt;/strong&gt; only if the user explicitly &lt;strong&gt;quits the app&lt;/strong&gt; — it&apos;s almost the same as having the same tab open in the browser. I know people who don&apos;t quit their home screen apps for months.&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;Ideally, caching helps to load the site faster. Disabling cache is not the answer. It&apos;s also not reliable as you cannot control the behavior of your user&apos;s browser. We want to figure out a way to clear the browser or service worker cache every time a new version of our app is deployed to the server.&lt;/p&gt;
+&lt;p&gt;A simple yet effective approach&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;a href=&quot;https://docs.npmjs.com/about-semantic-versioning&quot;&gt;SemVer&lt;/a&gt; your deploys&lt;/li&gt;
+&lt;li&gt;Bundle the app version into the app&lt;/li&gt;
+&lt;li&gt;Generate a &lt;code&gt;meta.json&lt;/code&gt; file with the app version on each build&lt;/li&gt;
+&lt;li&gt;Fetch &lt;code&gt;meta.json&lt;/code&gt; on load and compare versions&lt;/li&gt;
+&lt;li&gt;Force clear cache and hard reload when there&apos;s a version mismatch&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h2&gt;&lt;a href=&quot;https://docs.npmjs.com/about-semantic-versioning&quot;&gt;SemVer&lt;/a&gt; your deploys&lt;/h2&gt;
+&lt;p&gt;Version all your deploys with &lt;a href=&quot;https://docs.npmjs.com/about-semantic-versioning&quot;&gt;SemVer&lt;/a&gt;. I personally use these three npm commands that automatically increments the package version and creates a git commit along with a corresponding version tag.&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;code&gt;npm version patch&lt;/code&gt; — &lt;em&gt;for releases with only bug fixes&lt;/em&gt;&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;npm version minor&lt;/code&gt; — &lt;em&gt;for releases with new features w/ or w/o bug fixes&lt;/em&gt;&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;npm version major&lt;/code&gt; — &lt;em&gt;for major releases or breaking features&lt;/em&gt;&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;Remember to push your commit with &lt;code&gt;--tag&lt;/code&gt; attribute — &lt;code&gt;git push origin master --tags&lt;/code&gt;&lt;/p&gt;
+&lt;h2&gt;Bundle the app version into the app&lt;/h2&gt;
+&lt;p&gt;Parse the package version during webpack build (or relevant build tool) and set a global variable in the app so you can conveniently check the version in the browser console as well as use this to compare with the latest version.&lt;/p&gt;
+&lt;pre&gt;&lt;code class=&quot;language-js&quot;&gt;import packageJson from &apos;{root-dir}/package.json&apos;;
+global.appVersion = packageJson.version;
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Once this is set, you will be able to check the app version in the browser console by typing &lt;code&gt;appVersion&lt;/code&gt;.&lt;/p&gt;
+&lt;h2&gt;Generate a &lt;code&gt;meta.json&lt;/code&gt; file with the app version on each build&lt;/h2&gt;
+&lt;p&gt;Run a script to generate a &lt;code&gt;meta.json&lt;/code&gt; file in the &lt;code&gt;public&lt;/code&gt; dir of your app. &lt;/p&gt;
+&lt;p&gt;Add a &lt;code&gt;prebuild&lt;/code&gt; npm script that will generate the &lt;code&gt;meta.json&lt;/code&gt; file before each &lt;code&gt;build&lt;/code&gt;.&lt;/p&gt;
+&lt;pre&gt;&lt;code class=&quot;language-js&quot;&gt;/* package.json */
+
+{
+    &quot;scripts&quot;: {
+        &quot;generate-build-version&quot;: &quot;node generate-build-version&quot;,
+        &quot;prebuild&quot;: &quot;npm run generate-build-version&quot;,
+        // other scripts
+     }
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;pre&gt;&lt;code class=&quot;language-js&quot;&gt;/* generate-build-version.js */
+
+const fs = require(&apos;fs&apos;);
+const packageJson = require(&apos;./package.json&apos;);
+
+const appVersion = packageJson.version;
+
+const jsonData = {
+  version: appVersion
+};
+
+var jsonContent = JSON.stringify(jsonData);
+
+fs.writeFile(&apos;./public/meta.json&apos;, jsonContent, &apos;utf8&apos;, function(err) {
+  if (err) {
+    console.log(&apos;An error occured while writing JSON Object to meta.json&apos;);
+    return console.log(err);
+  }
+
+  console.log(&apos;meta.json file has been saved with latest version number&apos;);
+});
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;After each build, once you deploy the app, &lt;code&gt;meta.json&lt;/code&gt; can be accessed using the path &lt;code&gt;/meta.json&lt;/code&gt; and you can fetch the json like a REST endpoint. It won&apos;t be cached by the browser as browsers don&apos;t cache XHR requests. So you will always get the latest &lt;code&gt;meta.json&lt;/code&gt; file even if your bundle files are cached.&lt;/p&gt;
+&lt;p&gt;So if the &lt;code&gt;appVersion&lt;/code&gt; in your bundle file is less than the &lt;code&gt;version&lt;/code&gt; in &lt;code&gt;meta.json&lt;/code&gt;, then we know that the &lt;strong&gt;browser cache is stale and we will need to invalidate it&lt;/strong&gt;.&lt;/p&gt;
+&lt;p&gt;You can use this script to compare semantic versions —&lt;/p&gt;
+&lt;pre&gt;&lt;code class=&quot;language-js&quot;&gt;// version from `meta.json` - first param
+// version in bundle file - second param
+const semverGreaterThan = (versionA, versionB) =&gt; {
+  const versionsA = versionA.split(/\./g);
+
+  const versionsB = versionB.split(/\./g);
+  while (versionsA.length || versionsB.length) {
+    const a = Number(versionsA.shift());
+
+    const b = Number(versionsB.shift());
+    // eslint-disable-next-line no-continue
+    if (a === b) continue;
+    // eslint-disable-next-line no-restricted-globals
+    return a &gt; b || isNaN(b);
+  }
+  return false;
+};
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;You can also find this code in my &lt;a href=&quot;https://github.com/flexdinesh/cache-busting-example/blob/ad03c264e2f52c71609726104e38ea3593520e07/src/CacheBuster.js#L6&quot;&gt;GitHub example&lt;/a&gt;&lt;/p&gt;
+&lt;h2&gt;Fetch &lt;code&gt;meta.json&lt;/code&gt; on load and compare versions&lt;/h2&gt;
+&lt;p&gt;When the &lt;code&gt;App&lt;/code&gt; is mounted, fetch &lt;code&gt;meta.json&lt;/code&gt; and compare the current version with the latest version in the server.&lt;/p&gt;
+&lt;p&gt;When there is a &lt;strong&gt;version mismatch&lt;/strong&gt; =&gt; force &lt;strong&gt;clear cache&lt;/strong&gt; and hard reload
+When the versions are the same =&gt; Render the rest of the app&lt;/p&gt;
+&lt;p&gt;I have built a &lt;code&gt;CacheBuster&lt;/code&gt; component that will force clear cache and reload the site. The logic will work for most of the sites but can be tweaked for custom cases depending on the applications.&lt;/p&gt;
+&lt;pre&gt;&lt;code class=&quot;language-jsx&quot;&gt;/* CacheBuster component */
+import packageJson from &apos;../package.json&apos;;
+global.appVersion = packageJson.version;
+
+const semverGreaterThan = (versionA, versionB) =&gt; {
+    // code from above snippet goes here
+}
+
+export default class CacheBuster extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = {
+      loading: true,
+      isLatestVersion: false,
+      refreshCacheAndReload: () =&gt; {
+        console.log(&apos;Clearing cache and hard reloading...&apos;)
+        if (caches) {
+          // Service worker cache should be cleared with caches.delete()
+          caches.keys().then(function(names) {
+            for (let name of names) caches.delete(name);
+          });
+        }
+        // delete browser cache and hard reload
+        window.location.reload(true);
+      }
+    };
+  }
+
+  componentDidMount() {
+    fetch(&apos;/meta.json&apos;)
+      .then((response) =&gt; response.json())
+      .then((meta) =&gt; {
+        const latestVersion = meta.version;
+        const currentVersion = global.appVersion;
+
+        const shouldForceRefresh = semverGreaterThan(latestVersion, currentVersion);
+        if (shouldForceRefresh) {
+          console.log(`We have a new version - ${latestVersion}. Should force refresh`);
+          this.setState({ loading: false, isLatestVersion: false });
+        } else {
+          console.log(`You already have the latest version - ${latestVersion}. No cache refresh needed.`);
+          this.setState({ loading: false, isLatestVersion: true });
+        }
+      });
+  }
+
+  render() {
+    const { loading, isLatestVersion, refreshCacheAndReload } = this.state;
+    return this.props.children({ loading, isLatestVersion, refreshCacheAndReload });
+  }
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;And we can use this &lt;code&gt;CacheBuster&lt;/code&gt; component to control the render in &lt;code&gt;App&lt;/code&gt; component&lt;/p&gt;
+&lt;pre&gt;&lt;code class=&quot;language-jsx&quot;&gt;/* App component */
+class App extends Component {
+  render() {
+    return (
+      &amp;#x3C;CacheBuster&gt;
+        {({ loading, isLatestVersion, refreshCacheAndReload }) =&gt; {
+          if (loading) return null;
+          if (!loading &amp;#x26;&amp;#x26; !isLatestVersion) {
+            // You can decide how and when you want to force reload
+            refreshCacheAndReload();
+          }
+
+          return (
+            &amp;#x3C;div className=&quot;App&quot;&gt;
+              &amp;#x3C;header className=&quot;App-header&quot;&gt;
+                &amp;#x3C;h1&gt;Cache Busting - Example&amp;#x3C;/h1&gt;
+                &amp;#x3C;p&gt;
+                  Bundle version - &amp;#x3C;code&gt;v{global.appVersion}&amp;#x3C;/code&gt;
+                &amp;#x3C;/p&gt;
+              &amp;#x3C;/header&gt;
+            &amp;#x3C;/div&gt;
+          );
+        }}
+      &amp;#x3C;/CacheBuster&gt;
+    );
+  }
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;You can also find the code for both these components here —&lt;/p&gt;
+&lt;p&gt;CacheBuster - &lt;a href=&quot;https://github.com/flexdinesh/cache-busting-example/blob/master/src/CacheBuster.js&quot;&gt;CacheBuster.js&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;App - &lt;a href=&quot;https://github.com/flexdinesh/cache-busting-example/blob/master/src/App.js&quot;&gt;App.js&lt;/a&gt;&lt;/p&gt;
+&lt;h2&gt;Force clear cache and hard reload when there&apos;s a version mismatch&lt;/h2&gt;
+&lt;p&gt;Every time the app is loaded, we check for the latest version. Depending on whether the app version is stale or not, we can decide to clear cache in different ways.&lt;/p&gt;
+&lt;p&gt;For instance,&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;You can hard-reload before rendering the app&lt;/li&gt;
+&lt;li&gt;You can show a modal/popup asking the user to click a button and trigger a hard-reload&lt;/li&gt;
+&lt;li&gt;You can hard-reload when the app is idle&lt;/li&gt;
+&lt;li&gt;You can hard-reload after a few seconds with &lt;code&gt;setTimeout()&lt;/code&gt;&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;You can find the entire code from this post with a working example in this repo — &lt;a href=&quot;https://github.com/flexdinesh/cache-busting-example&quot;&gt;cache-busting-example&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;That&apos;s all folks. If you have any feedback for this approach (good and bad), do let me know in the comments.&lt;/p&gt;
+&lt;p&gt;Cache busting is fun. 🎉&lt;/p&gt;</content:encoded></item><item><title><![CDATA[React Hooks - Test custom hooks with Enzyme]]></title><description><![CDATA[This article is also cross-posted in — DEV - React Hooks: Test custom hooks with Enzyme codeburst - React Hooks: Test custom hooks with…]]></description><link>https://dineshpandiyan.com/test-custom-react-hooks-with-enzyme/</link><guid isPermaLink="false">https://dineshpandiyan.com/test-custom-react-hooks-with-enzyme/</guid><pubDate>Sat, 23 Mar 2019 00:00:00 GMT</pubDate><content:encoded>&lt;p&gt;This article is also cross-posted in —&lt;/p&gt;
+&lt;p&gt;DEV - &lt;a href=&quot;https://dev.to/flexdinesh/react-hooks-test-custom-hooks-with-enzyme-40ib&quot;&gt;React Hooks: Test custom hooks with Enzyme&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;codeburst - &lt;a href=&quot;https://codeburst.io/react-hooks-test-custom-hooks-with-enzyme-fdb233707dce&quot;&gt;React Hooks: Test custom hooks with Enzyme&lt;/a&gt;&lt;/p&gt;
+&lt;hr&gt;
+&lt;p&gt;&lt;strong&gt;TL;DR&lt;/strong&gt; - Wrap your custom hook in a component and shallow render it to test implementation details.&lt;/p&gt;
+&lt;h1&gt;What you will learn&lt;/h1&gt;
+&lt;ul&gt;
+&lt;li&gt;
+&lt;p&gt;React test strategies&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;user observable behaviour&lt;/strong&gt;&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;implementation details&lt;/strong&gt;&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;li&gt;Testing custom hooks with Enzyme&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h2&gt;Test Strategies&lt;/h2&gt;
+&lt;p&gt;There are broadly two strategies to test our React codebase.&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;Testing user observable behaviour&lt;/li&gt;
+&lt;li&gt;Testing implementation details&lt;/li&gt;
+&lt;/ol&gt;
+&lt;h3&gt;Testing user observable behaviour&lt;/h3&gt;
+&lt;p&gt;Testing user observable behaviour means writing tests against components that test&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;how the component is rendered&lt;/li&gt;
+&lt;li&gt;how the component is re-rendered when user interacts with the DOM&lt;/li&gt;
+&lt;li&gt;how props/state control what is rendered&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;Consider the following component - &lt;code&gt;Greet&lt;/code&gt;&lt;/p&gt;
+&lt;pre&gt;&lt;code class=&quot;language-jsx&quot;&gt;function Greet({ user = &apos;User&apos; }) {
+  const [name, setName] = React.useState(user);
+
+  return &amp;#x3C;div onClick={() =&gt; setName(&apos;Pinocchio&apos;)}&gt;Hello, {name}!&amp;#x3C;/div&gt;;
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Testing the user observable behaviour in &lt;code&gt;Greet&lt;/code&gt; would mean&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;test if &lt;code&gt;Greet&lt;/code&gt; is rendered without crashing&lt;/li&gt;
+&lt;li&gt;test if &lt;code&gt;Hello, User!&lt;/code&gt; is rendered when user prop is not passed&lt;/li&gt;
+&lt;li&gt;test if &lt;code&gt;Hello, Bruce!&lt;/code&gt; is rendered when &lt;code&gt;Bruce&lt;/code&gt; is passed as value to &lt;code&gt;user&lt;/code&gt; prop&lt;/li&gt;
+&lt;li&gt;test if the text changes to &lt;code&gt;Hello, Pinocchio!&lt;/code&gt; when the user clicks on the element&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3&gt;Testing implementation details&lt;/h3&gt;
+&lt;p&gt;Testing implementation details means writing tests against state logic that test&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;how the state is initialized with default/prop values&lt;/li&gt;
+&lt;li&gt;how the state changes when handlers are invoked&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;Consider the same component - &lt;code&gt;Greet&lt;/code&gt;&lt;/p&gt;
+&lt;pre&gt;&lt;code class=&quot;language-jsx&quot;&gt;function Greet({ user = &apos;User&apos; }) {
+  const [name, setName] = React.useState(user);
+
+  return &amp;#x3C;div onClick={() =&gt; setName(&apos;Pinocchio&apos;)}&gt;Hello, {name}!&amp;#x3C;/div&gt;;
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Testing implementation details in &lt;code&gt;Greet&lt;/code&gt; would mean&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;test if &lt;code&gt;name&lt;/code&gt; is set to default value &lt;code&gt;User&lt;/code&gt; when user prop is not passed to &lt;code&gt;Greet&lt;/code&gt;&lt;/li&gt;
+&lt;li&gt;test if &lt;code&gt;name&lt;/code&gt; is set to prop value when user prop is passed to &lt;code&gt;Greet&lt;/code&gt;&lt;/li&gt;
+&lt;li&gt;test if &lt;code&gt;name&lt;/code&gt; is updated when &lt;code&gt;setName&lt;/code&gt; is invoked&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h2&gt;Testing custom hooks with Enzyme&lt;/h2&gt;
+&lt;p&gt;&lt;em&gt;Note: Please make sure your React version is &lt;code&gt;^16.8.5&lt;/code&gt;. Hooks won&apos;t re-render components with enzyme shallow render in previous versions and the React team fixed it in this release. If your React version is below that, you might have to use enzyme mount and &lt;code&gt;.update()&lt;/code&gt; your wrapper after each change to test the re-render.&lt;/em&gt;&lt;/p&gt;
+&lt;p&gt;Testing implementation details might seem unnecessary and might even be considered as a bad practice when you are writing tests against components that contains presentational (UI) logic and render elements to the DOM. But &lt;strong&gt;custom hooks&lt;/strong&gt; contain only &lt;strong&gt;state logic&lt;/strong&gt; and it is imperative that we test the implementation details thoroughly so we know exactly how our custom hook will behave within a component.&lt;/p&gt;
+&lt;p&gt;Let&apos;s write a custom hook to update and validate a form field.&lt;/p&gt;
+&lt;pre&gt;&lt;code class=&quot;language-js&quot;&gt;/* useFormField.js */
+
+import React from &apos;react&apos;;
+
+function useFormField(initialVal = &apos;&apos;) {
+  const [val, setVal] = React.useState(initialVal);
+  const [isValid, setValid] = React.useState(true);
+
+  function onChange(e) {
+    setVal(e.target.value);
+
+    if (!e.target.value) {
+      setValid(false);
+    } else if (!isValid) setValid(true);
+  }
+
+  return [val, onChange, isValid];
+}
+
+export default useFormField;
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;strong&gt;As great as custom hooks are in abstracting away re-usable logic in our code, they do have one limitation. Even though they are just JavaScript functions they will work only inside React components. You cannot just invoke them and write tests against what a hook returns. You have to wrap them inside a React component and test the values that it returns.&lt;/strong&gt;&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;custom hooks cannot be tested like JavaScript functions&lt;/li&gt;
+&lt;li&gt;custom hooks should be wrapped inside a React component to test its behaviour&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;Thanks to the composibility of hooks, we could pass a hook as a prop to a component and everything will work exactly as how it&apos;s supposed to work. We can write a wrapper component to render and test our hook.&lt;/p&gt;
+&lt;pre&gt;&lt;code class=&quot;language-jsx&quot;&gt;/* useFormField.test.js */
+
+function HookWrapper(props) {
+  const hook = props.hook ? props.hook() : undefined;
+  return &amp;#x3C;div hook={hook} /&gt;;
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Now we can access the hook like a JavaScript object and test its behaviour.&lt;/p&gt;
+&lt;pre&gt;&lt;code class=&quot;language-jsx&quot;&gt;/* useFormField.test.js */
+
+import React from &apos;react&apos;;
+import { shallow } from &apos;enzyme&apos;;
+import useFormField from &apos;./useFormField&apos;;
+
+function HookWrapper(props) {
+  const hook = props.hook ? props.hook() : undefined;
+  return &amp;#x3C;div hook={hook} /&gt;;
+}
+
+it(&apos;should set init value&apos;, () =&gt; {
+  let wrapper = shallow(&amp;#x3C;HookWrapper hook={() =&gt; useFormField(&apos;&apos;)} /&gt;);
+
+  let { hook } = wrapper.find(&apos;div&apos;).props();
+  let [val, onChange, isValid] = hook;
+  expect(val).toEqual(&apos;&apos;);
+
+  wrapper = shallow(&amp;#x3C;HookWrapper hook={() =&gt; useFormField(&apos;marco&apos;)} /&gt;);
+
+  // destructuring objects - {} should be inside brackets - () to avoid syntax error
+  ({ hook } = wrapper.find(&apos;div&apos;).props());
+  [val, onChange, isValid] = hook;
+  expect(val).toEqual(&apos;marco&apos;);
+});
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;The full test suite for &lt;code&gt;useFormField&lt;/code&gt; custom hook will look like this.&lt;/p&gt;
+&lt;pre&gt;&lt;code class=&quot;language-jsx&quot;&gt;/* useFormField.test.js */
+
+import React from &apos;react&apos;;
+import { shallow } from &apos;enzyme&apos;;
+import useFormField from &apos;./useFormField&apos;;
+
+function HookWrapper(props) {
+  const hook = props.hook ? props.hook() : undefined;
+  return &amp;#x3C;div hook={hook} /&gt;;
+}
+
+describe(&apos;useFormField&apos;, () =&gt; {
+  it(&apos;should render&apos;, () =&gt; {
+    let wrapper = shallow(&amp;#x3C;HookWrapper /&gt;);
+
+    expect(wrapper.exists()).toBeTruthy();
+  });
+
+  it(&apos;should set init value&apos;, () =&gt; {
+    let wrapper = shallow(&amp;#x3C;HookWrapper hook={() =&gt; useFormField(&apos;&apos;)} /&gt;);
+
+    let { hook } = wrapper.find(&apos;div&apos;).props();
+    let [val, onChange, isValid] = hook;
+    expect(val).toEqual(&apos;&apos;);
+
+    wrapper = shallow(&amp;#x3C;HookWrapper hook={() =&gt; useFormField(&apos;marco&apos;)} /&gt;);
+
+    // destructuring objects - {} should be inside brackets - () to avoid syntax error
+    ({ hook } = wrapper.find(&apos;div&apos;).props());
+    [val, onChange, isValid] = hook;
+    expect(val).toEqual(&apos;marco&apos;);
+  });
+
+  it(&apos;should set the right val value&apos;, () =&gt; {
+    let wrapper = shallow(&amp;#x3C;HookWrapper hook={() =&gt; useFormField(&apos;marco&apos;)} /&gt;);
+
+    let { hook } = wrapper.find(&apos;div&apos;).props();
+    let [val, onChange, isValid] = hook;
+    expect(val).toEqual(&apos;marco&apos;);
+
+    onChange({ target: { value: &apos;polo&apos; } });
+
+    ({ hook } = wrapper.find(&apos;div&apos;).props());
+    [val, onChange, isValid] = hook;
+    expect(val).toEqual(&apos;polo&apos;);
+  });
+
+  it(&apos;should set the right isValid value&apos;, () =&gt; {
+    let wrapper = shallow(&amp;#x3C;HookWrapper hook={() =&gt; useFormField(&apos;marco&apos;)} /&gt;);
+
+    let { hook } = wrapper.find(&apos;div&apos;).props();
+    let [val, onChange, isValid] = hook;
+    expect(val).toEqual(&apos;marco&apos;);
+    expect(isValid).toEqual(true);
+
+    onChange({ target: { value: &apos;polo&apos; } });
+
+    ({ hook } = wrapper.find(&apos;div&apos;).props());
+    [val, onChange, isValid] = hook;
+    expect(val).toEqual(&apos;polo&apos;);
+    expect(isValid).toEqual(true);
+
+    onChange({ target: { value: &apos;&apos; } });
+
+    ({ hook } = wrapper.find(&apos;div&apos;).props());
+    [val, onChange, isValid] = hook;
+    expect(val).toEqual(&apos;&apos;);
+    expect(isValid).toEqual(false);
+  });
+});
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Rendering the custom hook and accessing it as a prop should give us full access to its return values.&lt;/p&gt;
+&lt;p&gt;If you&apos;re using &lt;code&gt;useEffect&lt;/code&gt; hook in your custom hook, make sure you wrap the &lt;code&gt;shallow&lt;/code&gt; or &lt;code&gt;mount&lt;/code&gt; call with &lt;a href=&quot;https://reactjs.org/docs/test-utils.html#act&quot;&gt;ReactTestUtils.act()&lt;/a&gt; to have the effects flushed out before assertions. Enzyme might support this internally soon but for now, this is required. More info on this here - &lt;a href=&quot;https://reactjs.org/docs/hooks-faq.html#how-to-test-components-that-use-hooks&quot;&gt;hooks-faq&lt;/a&gt;.&lt;/p&gt;
+&lt;pre&gt;&lt;code class=&quot;language-js&quot;&gt;act(() =&gt; {
+  wrapper = shallow(&amp;#x3C;HookWrapper /&gt;);
+});
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;All code snippets in this post can be found in the repo - &lt;a href=&quot;https://github.com/flexdinesh/testing-hooks&quot;&gt;testing-hooks&lt;/a&gt; with a working example.&lt;/p&gt;
+&lt;p&gt;Happy testing! 🎉&lt;/p&gt;</content:encoded></item><item><title><![CDATA[Don't build your portfolio with just React]]></title><description><![CDATA[This article is also cross-posted in — DEV - Don't build your portfolio with just React TL;DR - Use React along with Gatsby or Next to build…]]></description><link>https://dineshpandiyan.com/dont-build-portfolio-with-just-react/</link><guid isPermaLink="false">https://dineshpandiyan.com/dont-build-portfolio-with-just-react/</guid><pubDate>Fri, 01 Feb 2019 00:00:00 GMT</pubDate><content:encoded>&lt;p&gt;This article is also cross-posted in —&lt;/p&gt;
+&lt;p&gt;DEV - &lt;a href=&quot;https://dev.to/flexdinesh/dont-build-your-portfolio-with-just-react-11a9&quot;&gt;Don&apos;t build your portfolio with just React&lt;/a&gt;&lt;/p&gt;
+&lt;hr&gt;
+&lt;p&gt;&lt;strong&gt;TL;DR&lt;/strong&gt; - Use React along with &lt;a href=&quot;https://www.gatsbyjs.org/&quot;&gt;Gatsby&lt;/a&gt; or &lt;a href=&quot;https://nextjs.org/&quot;&gt;Next&lt;/a&gt; to build static public sites.&lt;/p&gt;
+&lt;p&gt;React is all the rage these days and IMHO developing websites feels a lot easier with React. Of course, you can use and favor other frameworks too but I&apos;m gonna limit the context of this post to React affictionados.&lt;/p&gt;
+&lt;h1&gt;Why you should use React&lt;/h1&gt;
+&lt;ul&gt;
+&lt;li&gt;Component based&lt;/li&gt;
+&lt;li&gt;Pre-configured (for most part) starter with &lt;a href=&quot;https://facebook.github.io/create-react-app/&quot;&gt;create-react-app&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;Faster development&lt;/li&gt;
+&lt;li&gt;React is AWESOME 🎉&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h1&gt;Why you shouldn&apos;t use just React&lt;/h1&gt;
+&lt;ul&gt;
+&lt;li&gt;DOM is constructed in the browser (client-side)&lt;/li&gt;
+&lt;li&gt;SEO implications&lt;/li&gt;
+&lt;li&gt;Higher &lt;a href=&quot;https://developers.google.com/web/tools/lighthouse/audits/time-to-interactive&quot;&gt;Time to Interactive (TTI)&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;Let&apos;s get a little more into why all these things happen.&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;React loads the site into DOM after this line is invoked&lt;/strong&gt;.&lt;/p&gt;
+&lt;pre&gt;&lt;code class=&quot;language-js&quot;&gt;ReactDOM.render(&amp;#x3C;App /&gt;, document.getElementById(&apos;root&apos;));
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;What this means it, the whole DOM, styles and behavior of the site is initialized only after the &lt;code&gt;bundle.js&lt;/code&gt; is loaded and executed.&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;If you turn off JavaScript in your browser settings and open a React site, nothing will load and you will see only an empty page&lt;/strong&gt;.&lt;/p&gt;
+&lt;p&gt;Unfortunately that&apos;s how &lt;strong&gt;search engines&lt;/strong&gt; look at your site during &lt;strong&gt;indexing&lt;/strong&gt;. So if you create your site with just React, only your page title will be indexed and nothing else inside your React code will be indexed.&lt;/p&gt;
+&lt;p&gt;&lt;em&gt;Edit: Google executes JavaScript during indexing to a limited extent, meaning if you don&apos;t have content in first render or if render takes more than N secs, it skips the content. Also DuckDuckGo is becoming the de-facto search engine to a lot of folks in recent times and it&apos;s been my only search engine for more than a year now. And DuckDuckGo doesn&apos;t execute JavaScript during indexing. So &lt;strong&gt;relying on search engines to execute JavaScript is not a safe bet&lt;/strong&gt;.&lt;/em&gt;&lt;/p&gt;
+&lt;p&gt;Other than SEO implications, loading your site without the DOM in the first load (paint) increases your TTI metric. If you could load the DOM in the first load before loading your scripts, you&apos;ll drastically improve the UX.&lt;/p&gt;
+&lt;h1&gt;SSR and Static Site Generation for the Rescue&lt;/h1&gt;
+&lt;blockquote&gt;
+&lt;p&gt;&lt;strong&gt;SSR Websites&lt;/strong&gt; and &lt;strong&gt;Static Websites&lt;/strong&gt; are two different things. SSR pages are rendered from a server on each request where as static pages are generated during build time. &lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;If you use frameworks like &lt;a href=&quot;https://www.gatsbyjs.org/&quot;&gt;Gatsby&lt;/a&gt; or &lt;a href=&quot;https://nextjs.org/&quot;&gt;Next&lt;/a&gt;, you can either generate static sites or create SSR pages.&lt;/p&gt;
+&lt;p&gt;In other words, if you turn off your JavaScript and load these sites, the whole DOM will be loaded as the pages are already rendered.&lt;/p&gt;
+&lt;p&gt;Ideally, only event handlers and complementary data should be loaded and attached after the first render. &lt;/p&gt;
+&lt;h1&gt;Gatsby or Next?&lt;/h1&gt;
+&lt;ul&gt;
+&lt;li&gt;If you are building a static public website, Gatsby will be the right tool.&lt;/li&gt;
+&lt;li&gt;If you are building a website that has a login and a lot of server side logic, Next will be the right tool.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;Of course there are a lot other options and reasons to choose your right tool but personally these two will be enough for most preliminary requirements.&lt;/p&gt;
+&lt;p&gt;Other points to argue&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;You can create SSR pages with React but you will need to setup your server and everything manually. Next.js makes this whole process easier.&lt;/li&gt;
+&lt;li&gt;Google claims that it executes JavaScript recently while indexing, but I tried and it didn&apos;t work for me. We&apos;re not sure of the nuances of it.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h2&gt;Gatsby is ❤️&lt;/h2&gt;
+&lt;p&gt;In other news, I&apos;m totally smitten and unfathomably in love with &lt;a href=&quot;https://www.gatsbyjs.org/&quot;&gt;Gatsby&lt;/a&gt; ❤️&lt;/p&gt;
+&lt;p&gt;I migrated my &lt;a href=&quot;https://portfoliov2.dineshpandiyan.com&quot;&gt;old portfolio&lt;/a&gt; from React to Gatsby exactly for the reasons discussed in this post. This is my new portfolio in Gatsby - &lt;a href=&quot;https://dineshpandiyan.com&quot;&gt;Dinesh Pandiyan&lt;/a&gt;.&lt;/p&gt;
+&lt;p&gt;Going forward, I&apos;m planning to build all my side projects in Gatsby this year. I created a Gatsby starter boilerplate with added configurations over default Gatsby starter - &lt;a href=&quot;https://github.com/flexdinesh/gatsby-boilerplate&quot;&gt;Gatsby Boilerplate&lt;/a&gt;.&lt;/p&gt;
+&lt;p&gt;My Gatsby based sites so far&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;a href=&quot;https://dineshpandiyan.com&quot;&gt;Dinesh Pandiyan&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href=&quot;https://tweetfancy.io&quot;&gt;tweetfancy.io&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;Another pet project in WIP stage. I&apos;ll probably launch it in a month.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;You are amazing! ✨&lt;/p&gt;</content:encoded></item><item><title><![CDATA[Deploy Gatsby sites to GitHub Pages]]></title><description><![CDATA[This article is also cross-posted in — DEV - Deploy Gatsby sites to GitHub Pages codeburst - Deploy Gatsby sites to GitHub Pages Gatsby is…]]></description><link>https://dineshpandiyan.com/deploy-gatsby-to-github-pages/</link><guid isPermaLink="false">https://dineshpandiyan.com/deploy-gatsby-to-github-pages/</guid><pubDate>Wed, 23 Jan 2019 00:00:00 GMT</pubDate><content:encoded>&lt;p&gt;This article is also cross-posted in —&lt;/p&gt;
+&lt;p&gt;DEV - &lt;a href=&quot;https://dev.to/flexdinesh/deploy-gatsby-sites-to-github-pages-eed&quot;&gt;Deploy Gatsby sites to GitHub Pages&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;codeburst - &lt;a href=&quot;https://codeburst.io/deploy-gatsby-sites-to-github-pages-625a9978e7cd&quot;&gt;Deploy Gatsby sites to GitHub Pages&lt;/a&gt;&lt;/p&gt;
+&lt;hr&gt;
+&lt;p&gt;&lt;a href=&quot;https://www.gatsbyjs.org/&quot;&gt;Gatsby&lt;/a&gt; is all the rage now, thanks to the amazing team behind the fancy and easy-to-use framework. I&apos;m not going to go into the details of why you &lt;strong&gt;should use Gatsby&lt;/strong&gt; if you&apos;re &lt;strong&gt;building a static website&lt;/strong&gt;. There are a ton of posts out there that say just that.&lt;/p&gt;
+&lt;p&gt;Here&apos;s an excellent article on why - &lt;a href=&quot;https://medium.freecodecamp.org/why-you-should-use-gatsbyjs-to-build-static-sites-4f90eb6d1a7b&quot;&gt;Why you should use GatsbyJS to build static sites&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;These are my top reasons&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Amazing Dev Experience&lt;/li&gt;
+&lt;li&gt;Pre-baked optimizations&lt;/li&gt;
+&lt;li&gt;Generated site is super fast&lt;/li&gt;
+&lt;li&gt;Out of the box support for GraphQL&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h2&gt;Deploy Gatsby sites anywhere&lt;/h2&gt;
+&lt;p&gt;Since Gatsby generates static files, you can deploy it anywhere.
+But the easiest and quickest option would be to deploy your site to &lt;a href=&quot;https://pages.github.com/&quot;&gt;GitHub Pages&lt;/a&gt;.&lt;/p&gt;
+&lt;h3&gt;GitHub Pages&lt;/h3&gt;
+&lt;p&gt;You can host static websites for free with GitHub Pages. You can have two types of websites hosted in GitHub Pages.&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;Personal Website - Repo name should be &lt;code&gt;username.github.io&lt;/code&gt; and the site can be accessed at &lt;code&gt;https://username.github.io&lt;/code&gt;&lt;/li&gt;
+&lt;li&gt;Project Website - Repo name can be anything and the site can be accessed at &lt;code&gt;https://username.github.io/repo-name&lt;/code&gt;&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;All you gotta do is to push the static site to the repo with &lt;code&gt;index.html&lt;/code&gt; at the root dir.&lt;/p&gt;
+&lt;p&gt;More info here - &lt;a href=&quot;https://pages.github.com/&quot;&gt;GitHub Pages&lt;/a&gt;&lt;/p&gt;
+&lt;h2&gt;Deploy Gatsby sites to GitHub Pages&lt;/h2&gt;
+&lt;p&gt;Gatsby generates your static site when you run the command &lt;code&gt;gatsby build&lt;/code&gt;.&lt;/p&gt;
+&lt;p&gt;Only catch here is that GitHub Pages expect your site files to be in the root dir but Gatsby generates the site files in a dir called &lt;code&gt;public&lt;/code&gt;. So we cannot host the source code and the public files in the same repo. &lt;/p&gt;
+&lt;p&gt;&lt;a href=&quot;https://www.npmjs.com/package/gh-pages&quot;&gt;gh-pages&lt;/a&gt; is a really nice package that helps you push static sites to a GitHub repo from anywhere.&lt;/p&gt;
+&lt;h3&gt;Steps&lt;/h3&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;code&gt;yarn add gh-pages --dev&lt;/code&gt;&lt;/li&gt;
+&lt;li&gt;Create a new dir &lt;code&gt;scripts&lt;/code&gt; at project root and create a file &lt;code&gt;deploy-github.js&lt;/code&gt; in &lt;code&gt;scripts&lt;/code&gt; dir&lt;/li&gt;
+&lt;li&gt;Add this code to &lt;code&gt;deploy-github.js&lt;/code&gt;&lt;/li&gt;
+&lt;/ul&gt;
+&lt;pre&gt;&lt;code class=&quot;language-js&quot;&gt;const ghpages = require(&apos;gh-pages&apos;)
+
+// replace with your repo url
+ghpages.publish(
+  &apos;public&apos;,
+  {
+    branch: &apos;master&apos;,
+    repo: &apos;https://github.com/flexdinesh/flexdinesh.github.io.git&apos;,
+  },
+  () =&gt; {
+    console.log(&apos;Deploy Complete!&apos;)
+  }
+)
+&lt;/code&gt;&lt;/pre&gt;
+&lt;ul&gt;
+&lt;li&gt;Add a new npm script &lt;code&gt;deploy:github&lt;/code&gt; in &lt;code&gt;package.json&lt;/code&gt;&lt;/li&gt;
+&lt;/ul&gt;
+&lt;pre&gt;&lt;code class=&quot;language-json&quot;&gt;&quot;deploy:github&quot;: &quot;npm run build &amp;#x26;&amp;#x26; node ./scripts/deploy-github&quot;
+&lt;/code&gt;&lt;/pre&gt;
+&lt;ul&gt;
+&lt;li&gt;Run the script and your static site will be up and running in a few seconds&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;&lt;em&gt;Note: When you run the command, you will be asked to enter your GitHub creds in the command line before publish.&lt;/em&gt;&lt;/p&gt;
+&lt;p&gt;If you need further materials, you could take a look at the source code of my personal website &lt;a href=&quot;https://github.com/flexdinesh/portfolio&quot;&gt;Dinesh Pandiyan - Portfolio&lt;/a&gt;. It is deployed in both Netlify and Github Pages.&lt;/p&gt;
+&lt;p&gt;If you&apos;re looking for a good Gatsby starter template, I maintain a boilerplate with my pre-baked web setup - &lt;a href=&quot;https://github.com/flexdinesh/gatsby-boilerplate&quot;&gt;Gatsby Boilerplate&lt;/a&gt;. I usually fork this repo if I want to start with a new Gatsby site.&lt;/p&gt;
+&lt;p&gt;Happy Gatsbying! 🔥&lt;/p&gt;</content:encoded></item><item><title><![CDATA[Tweet in bold, italics and strikethrough text]]></title><description><![CDATA[This article is also cross-posted in — DEV - Tweet in bold, italics and strikethrough text TL;DR - I built a tool - tweetfancy.io to tweet…]]></description><link>https://dineshpandiyan.com/tweet-fancy/</link><guid isPermaLink="false">https://dineshpandiyan.com/tweet-fancy/</guid><pubDate>Tue, 22 Jan 2019 00:00:00 GMT</pubDate><content:encoded>&lt;p&gt;This article is also cross-posted in —&lt;/p&gt;
+&lt;p&gt;DEV - &lt;a href=&quot;https://dev.to/flexdinesh/tweet-in-bold-italics-and-strikethough-text-3b1b&quot;&gt;Tweet in bold, italics and strikethrough text&lt;/a&gt;&lt;/p&gt;
+&lt;hr&gt;
+&lt;p&gt;&lt;em&gt;&lt;strong&gt;TL;DR&lt;/strong&gt; - I built a tool - &lt;a href=&quot;https://tweetfancy.io/&quot;&gt;tweetfancy.io&lt;/a&gt; to tweet in bold, italics and strikethrough text.&lt;/em&gt;&lt;/p&gt;
+&lt;p&gt;Ever fancied tweeting with &lt;strong&gt;bold&lt;/strong&gt;, &lt;em&gt;italics&lt;/em&gt; or &lt;del&gt;strikethrough&lt;/del&gt; text?&lt;/p&gt;
+&lt;p&gt;Twitter doesn&apos;t allow its users to format tweets. But having an option to &lt;em&gt;emphasize&lt;/em&gt; or &lt;strong&gt;call out&lt;/strong&gt; a word or a phrase in a tweet might come in handy at times.&lt;/p&gt;
+&lt;h1&gt;Announcing tweetfancy.io&lt;/h1&gt;
+&lt;p&gt;I recently realized that the UTF charset has &lt;a href=&quot;https://en.wikipedia.org/wiki/Mathematical_Alphanumeric_Symbols&quot;&gt;characters and symbols&lt;/a&gt; that look like &lt;strong&gt;bold&lt;/strong&gt;, &lt;em&gt;italics&lt;/em&gt; or &lt;del&gt;strikethrough&lt;/del&gt; ascii characters. So I built a tool that generates these characters which could be copied and pasted into almost any website out there.&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Write your original text in markdown&lt;/li&gt;
+&lt;li&gt;The editor will generate text for you to copy/paste&lt;/li&gt;
+&lt;li&gt;Tweet directly from the editor&lt;/li&gt;
+&lt;li&gt;Copy/Paste the generated text into any website (FB/Insta/etc)&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;&lt;em&gt;Note: The generated characters are mathematical symbols and not actual English alphabets. So if you run them by a screen reader, you&apos;ll find that the reader reads them out by their symbol name. But then, all screen readers struggle reading smileys too (🎉🔥🚀🦄😎) and that doesn&apos;t stop us from using smileys. So,we might use this as well.&lt;/em&gt;&lt;/p&gt;
+&lt;p&gt;Here&apos;s the link - &lt;a href=&quot;https://tweetfancy.io/&quot;&gt;tweetfancy.io&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;Go bonkers tweeting in &lt;strong&gt;bold&lt;/strong&gt;, &lt;em&gt;italics&lt;/em&gt; or &lt;del&gt;strikethrough&lt;/del&gt;! Happy tweeting! 🎉&lt;/p&gt;</content:encoded></item><item><title><![CDATA[2018 - Year In Review]]></title><description><![CDATA[This article is also cross-posted in — DEV - 2018 - Year In Review 2018 has been an amazing year for me. I learnt new things, built a few…]]></description><link>https://dineshpandiyan.com/2018-year-in-review/</link><guid isPermaLink="false">https://dineshpandiyan.com/2018-year-in-review/</guid><pubDate>Fri, 04 Jan 2019 00:00:00 GMT</pubDate><content:encoded>&lt;p&gt;This article is also cross-posted in —&lt;/p&gt;
+&lt;p&gt;DEV - &lt;a href=&quot;https://dev.to/flexdinesh/2018---year-in-review-515h&quot;&gt;2018 - Year In Review&lt;/a&gt;&lt;/p&gt;
+&lt;hr&gt;
+&lt;p&gt;2018 has been an amazing year for me. I &lt;strong&gt;learnt&lt;/strong&gt; new things, &lt;strong&gt;built&lt;/strong&gt; a few things, &lt;strong&gt;wrote&lt;/strong&gt; a handful of blog posts and &lt;strong&gt;met&lt;/strong&gt; some amazing devs in the community. But above all, I became a better dev by &lt;em&gt;learning and reflecting on my mistakes&lt;/em&gt; throughout. Here&apos;s a quick list down of how 2018 turned out to be an amazing year for me.&lt;/p&gt;
+&lt;h2&gt;Things I built in 2018&lt;/h2&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;a href=&quot;https://github.com/flexdinesh/browser-or-node&quot;&gt;Browser or Node&lt;/a&gt; - &lt;em&gt;January&lt;/em&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href=&quot;https://github.com/flexdinesh/typy&quot;&gt;Typy&lt;/a&gt; - &lt;em&gt;February&lt;/em&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href=&quot;https://github.com/flexdinesh/dev-landing-page&quot;&gt;Dev Landing Page&lt;/a&gt; - &lt;em&gt;March&lt;/em&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href=&quot;https://github.com/flexdinesh/axios-retry-interceptor&quot;&gt;Axios Retry Interceptor&lt;/a&gt; - &lt;em&gt;March&lt;/em&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href=&quot;https://github.com/flexdinesh/react-redux-boilerplate&quot;&gt;React-Redux Boilerplate&lt;/a&gt; - &lt;em&gt;March&lt;/em&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href=&quot;https://github.com/flexdinesh/react-render-in-browser&quot;&gt;React Render-In-Browser&lt;/a&gt; - &lt;em&gt;May&lt;/em&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href=&quot;https://github.com/flexdinesh/react-socks&quot;&gt;React Socks&lt;/a&gt; - &lt;em&gt;November&lt;/em&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href=&quot;https://github.com/flexdinesh/typy/blob/master/CHANGELOG.md#300-9-dec-2018&quot;&gt;Typy v3&lt;/a&gt; - &lt;em&gt;December&lt;/em&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href=&quot;https://github.com/flexdinesh/react-socks/blob/master/CHANGELOG.md#100-9-dec-2018&quot;&gt;React Socks Stable&lt;/a&gt; - &lt;em&gt;December&lt;/em&gt;&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h2&gt;Things I wrote in 2018&lt;/h2&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;a href=&quot;https://dev.to/flexdinesh/how-i-got-started-with-open-source--882&quot;&gt;How I got started with Open-Source&lt;/a&gt; - &lt;em&gt;February&lt;/em&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href=&quot;https://dev.to/flexdinesh/accessing-nested-objects-in-javascript--9m4&quot;&gt;Accessing Nested Objects in JavaScript&lt;/a&gt; - &lt;em&gt;February&lt;/em&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href=&quot;https://dev.to/flexdinesh/short-circuit-assignment-in-javascript--4k80&quot;&gt;Short Circuit Assignment in JavaScript&lt;/a&gt; - &lt;em&gt;February&lt;/em&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href=&quot;https://dev.to/flexdinesh/publish-your-own-npm-package---5b71&quot;&gt;Publish your own NPM package&lt;/a&gt; - &lt;em&gt;March&lt;/em&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href=&quot;https://dev.to/flexdinesh/create-your-developer-landing-page-with-github-pages---42jk&quot;&gt;Create your developer landing page with GitHub Pages&lt;/a&gt; - &lt;em&gt;March&lt;/em&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href=&quot;https://dev.to/flexdinesh/react-redux-boilerplate-with-best-practices--2pp5&quot;&gt;React-Redux Boilerplate with Best Practices&lt;/a&gt; - &lt;em&gt;March&lt;/em&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href=&quot;https://dev.to/flexdinesh/upgrade-to-webpack-4---5bc5&quot;&gt;Upgrade to Webpack 4&lt;/a&gt; - &lt;em&gt;March&lt;/em&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href=&quot;https://dev.to/flexdinesh/i-re-wrote-my-portfolio-and-added-some-magic-22n7&quot;&gt;I Created My Portfolio with React and Some Magic&lt;/a&gt; - &lt;em&gt;April&lt;/em&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href=&quot;https://dev.to/flexdinesh/render-browser-specific-content-with-react--amm&quot;&gt;Render Browser Specific Content with React&lt;/a&gt; - &lt;em&gt;May&lt;/em&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href=&quot;https://dev.to/flexdinesh/introducing-responsive-react-components--1a6a&quot;&gt;Introducing Responsive React Components&lt;/a&gt; - &lt;em&gt;November&lt;/em&gt;&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h2&gt;Goal Stats&lt;/h2&gt;
+&lt;ul&gt;
+&lt;li&gt;✅ Start with OSS &lt;em&gt;(have over 10 actively maintained projects now)&lt;/em&gt;&lt;/li&gt;
+&lt;li&gt;✅ Become an active contributor to a repo that’s not mine &lt;em&gt;(became one of the top contributors)&lt;/em&gt;&lt;/li&gt;
+&lt;li&gt;✅ Create and publish a library that others find helpful &lt;em&gt;(have 7 libs now with 130k+ downloads)&lt;/em&gt;&lt;/li&gt;
+&lt;li&gt;✅ Build a portfolio&lt;/li&gt;
+&lt;li&gt;✅ Hit 1k reps in Stack Overflow &lt;em&gt;(2.4k currently)&lt;/em&gt;&lt;/li&gt;
+&lt;li&gt;✅ Hit 1k followers in dev.to &lt;em&gt;(2.2k currently)&lt;/em&gt;&lt;/li&gt;
+&lt;li&gt;✅ Learn Docker, ELK stack, reverse proxy&lt;/li&gt;
+&lt;li&gt;⚠️ Hit 700 followers in twitter &lt;em&gt;(695 now)&lt;/em&gt;&lt;/li&gt;
+&lt;li&gt;❌ Build a website that others find helpful&lt;/li&gt;
+&lt;li&gt;❌ Learn GraphQL, serverless, web components&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h2&gt;Summary&lt;/h2&gt;
+&lt;ul&gt;
+&lt;li&gt;Started with &lt;strong&gt;OSS&lt;/strong&gt;&lt;/li&gt;
+&lt;li&gt;Quit my awesome job to take on a &lt;strong&gt;challenging&lt;/strong&gt; role&lt;/li&gt;
+&lt;li&gt;Moved to &lt;strong&gt;new country&lt;/strong&gt;&lt;/li&gt;
+&lt;li&gt;Started contributing more in &lt;strong&gt;Stack Overflow&lt;/strong&gt;&lt;/li&gt;
+&lt;li&gt;Started building and &lt;strong&gt;publishing libraries&lt;/strong&gt;&lt;/li&gt;
+&lt;li&gt;Started &lt;strong&gt;writing&lt;/strong&gt; about the things I learn and the things I build&lt;/li&gt;
+&lt;li&gt;Became a publisher in &lt;strong&gt;Hackernoon&lt;/strong&gt; and &lt;strong&gt;Codeburst&lt;/strong&gt;&lt;/li&gt;
+&lt;li&gt;All my write ups together have been viewed over &lt;strong&gt;250k times&lt;/strong&gt; (100k+ DEV and 150k+ Medium)&lt;/li&gt;
+&lt;li&gt;A few blog posts that I wrote got featured in other platforms and curations&lt;/li&gt;
+&lt;li&gt;Found awesome people in the community (twitter and dev.to) and drew &lt;strong&gt;inspiration&lt;/strong&gt; from them&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h2&gt;Dev principles I picked up in 2018&lt;/h2&gt;
+&lt;p&gt;I want to wrap up this post by highlighting a few dev principles I learnt and strictly adopted in my workflow in 2018.&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Code &lt;strong&gt;without tests&lt;/strong&gt; is as good as &lt;strong&gt;no code at all&lt;/strong&gt;&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;No&lt;/strong&gt; Abstraction &lt;strong&gt;&gt;&lt;/strong&gt; &lt;strong&gt;Wrong&lt;/strong&gt; Abstraction&lt;/li&gt;
+&lt;li&gt;Most optimization strategies you come up with will either result in &lt;strong&gt;premature-optimization&lt;/strong&gt; or &lt;strong&gt;over-optimization&lt;/strong&gt;. &lt;strong&gt;Optimize only when absolutely necessary&lt;/strong&gt;.&lt;/li&gt;
+&lt;li&gt;Have a broader vision of the problem/solution but break it down and build in &lt;strong&gt;small portions&lt;/strong&gt; incrementally&lt;/li&gt;
+&lt;li&gt;If you add a todo to improve later, you’ll never get back to it. So, &lt;strong&gt;do it now&lt;/strong&gt;.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;🥂 To another wonderful year full of opportunities and amazing people 🥂&lt;/p&gt;</content:encoded></item><item><title><![CDATA[Responsive React Components]]></title><description><![CDATA[This article is also cross-posted in — DEV - Introducing Responsive React Components HackerNoon - Introducing Responsive React Components…]]></description><link>https://dineshpandiyan.com/responsive-react-components/</link><guid isPermaLink="false">https://dineshpandiyan.com/responsive-react-components/</guid><pubDate>Tue, 20 Nov 2018 00:00:00 GMT</pubDate><content:encoded>&lt;p&gt;This article is also cross-posted in —&lt;/p&gt;
+&lt;p&gt;DEV - &lt;a href=&quot;https://dev.to/flexdinesh/introducing-responsive-react-components--1a6a&quot;&gt;Introducing Responsive React Components&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;HackerNoon - &lt;a href=&quot;https://hackernoon.com/introducing-responsive-react-components-f6cd14976570&quot;&gt;Introducing Responsive React Components&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;codeburst - &lt;a href=&quot;https://codeburst.io/introducing-responsive-react-components-93524b02601e&quot;&gt;Introducing Responsive React Components&lt;/a&gt;&lt;/p&gt;
+&lt;hr&gt;
+&lt;p&gt;&lt;img src=&quot;https://image.ibb.co/hXCL70/responsive-react-banner.png&quot; alt=&quot;Responsive React Components&quot;&gt;&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;TL;DR&lt;/strong&gt; - &lt;em&gt;You can render viewport specific components in React with a one-liner&lt;/em&gt;&lt;/p&gt;
+&lt;p&gt;React is awesome and the whole world agrees to it unanimously. Development is a whole lot faster and easier when we look at everything as components. Since everything is JavaScript driven, &lt;strong&gt;React renders only the code that is necessary based on application&apos;s state&lt;/strong&gt;. It doesn&apos;t matter if you have over a thousand components and tens of thousands of lines of code. &lt;strong&gt;If you &lt;a href=&quot;https://medium.freecodecamp.org/how-to-use-react-lazy-and-suspense-for-components-lazy-loading-8d420ecac58&quot;&gt;lazy load&lt;/a&gt; your components, you load only what&apos;s necessary for the user and I think that is the biggest win with using React&lt;/strong&gt;.&lt;/p&gt;
+&lt;p&gt;That being said, have you ever wondered what happens when you write media queries in your React codebase?&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;You render elements that&apos;s not supposed to be in a particular viewport and hide it using css&lt;/strong&gt;.&lt;/p&gt;
+&lt;p&gt;In this example&lt;/p&gt;
+&lt;pre&gt;&lt;code class=&quot;language-jsx&quot;&gt;import React from &apos;react&apos;
+import &apos;./Example.style.scss&apos;
+
+const Example = () =&gt; {
+  return (
+    &amp;#x3C;div className=&quot;example&quot;&gt;
+      &amp;#x3C;div className=&quot;mobile-only&quot;&gt;I&apos;m a fancy mobile div&amp;#x3C;/div&gt;
+      &amp;#x3C;div className=&quot;desktop-only&quot;&gt;I&apos;m a heavy desktop div&amp;#x3C;/div&gt;
+    &amp;#x3C;/div&gt;
+  )
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;code&gt;Example.style.scss&lt;/code&gt; file&lt;/p&gt;
+&lt;pre&gt;&lt;code class=&quot;language-scss&quot;&gt;.example {
+  .mobile-only {
+    @media (min-width: 768px) {
+      display: none;
+    }
+  }
+  .desktop-only {
+    @media (max-width: 767px) {
+      display: none;
+    }
+  }
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;When &lt;code&gt;Example&lt;/code&gt; component renders, &lt;strong&gt;both&lt;/strong&gt; &lt;code&gt;.mobile-only&lt;/code&gt; and &lt;code&gt;.desktop-only&lt;/code&gt; elements &lt;strong&gt;will be rendered&lt;/strong&gt; in the DOM but &lt;code&gt;.mobile-only&lt;/code&gt; div will be hidden in bigger viewports and &lt;code&gt;.desktop-only&lt;/code&gt; div will be hidden in smaller viewports with css &lt;code&gt;display: none&lt;/code&gt;.&lt;/p&gt;
+&lt;p&gt;This is okay if this is small. But in one of the projects I worked, we had a heavy desktop menu and a heavy mobile menu both rendered in all the viewports. &lt;strong&gt;Just the &lt;code&gt;Menu&lt;/code&gt; alone should be around &lt;code&gt;20Kb&lt;/code&gt; in size&lt;/strong&gt; each and we easily had an unwanted &lt;code&gt;20Kb&lt;/code&gt; being loaded into the browser for each user. If you have more viewport specific elements, this size is going to keep increasing.&lt;/p&gt;
+&lt;h2&gt;Introducing React Socks&lt;/h2&gt;
+&lt;p&gt;&lt;a href=&quot;https://github.com/flexdinesh/react-socks&quot;&gt;React Socks&lt;/a&gt; is a &lt;strong&gt;minimal React library&lt;/strong&gt; to &lt;strong&gt;render components based on viewport&lt;/strong&gt;.&lt;/p&gt;
+&lt;p&gt;Say goodbye to media-queries. Here&apos;s how you can render viewport specific components with an uber-cool syntax.&lt;/p&gt;
+&lt;pre&gt;&lt;code class=&quot;language-jsx&quot;&gt;const Example = () =&gt; {
+  return (
+    &amp;#x3C;Breakpoint small down&gt;
+      &amp;#x3C;MyAwesomeMobileMenu&gt;
+        This component will render only in mobile devices
+      &amp;#x3C;/MyAwesomeMobileMenu&gt;
+    &amp;#x3C;/Breakpoint&gt;
+  )
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;pre&gt;&lt;code class=&quot;language-jsx&quot;&gt;const Example = () =&gt; {
+  return (
+    &amp;#x3C;div&gt;
+      &amp;#x3C;Breakpoint small down&gt;
+        &amp;#x3C;div&gt;I will render only in mobile devices&amp;#x3C;/div&gt;
+      &amp;#x3C;/Breakpoint&gt;
+
+      &amp;#x3C;Breakpoint medium only&gt;
+        &amp;#x3C;div&gt;I will render only in tablets (iPad, etc...)&amp;#x3C;/div&gt;
+      &amp;#x3C;/Breakpoint&gt;
+
+      &amp;#x3C;Breakpoint large up&gt;
+        &amp;#x3C;div&gt;I will render in laptops, desktops and everything bigger&amp;#x3C;/div&gt;
+      &amp;#x3C;/Breakpoint&gt;
+    &amp;#x3C;/div&gt;
+  )
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;And that&apos;s not just it. &lt;strong&gt;You can specify your own breakpoints&lt;/strong&gt; (as many as you want &lt;strong&gt;wow!&lt;/strong&gt;) and use them &lt;strong&gt;according to your project needs&lt;/strong&gt;. Also, you will have to &lt;code&gt;setDefaultBreakpoints&lt;/code&gt; only once in your project 😎&lt;/p&gt;
+&lt;pre&gt;&lt;code class=&quot;language-jsx&quot;&gt;import { setDefaultBreakpoints } from &apos;react-socks&apos;
+
+setDefaultBreakpoints([
+  { xs: 0 },
+  { s: 376 },
+  { m: 426 },
+  { l: 769 },
+  { xl: 1025 },
+])
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;These are my favourite breakpoints&lt;/p&gt;
+&lt;pre&gt;&lt;code class=&quot;language-jsx&quot;&gt;setDefaultBreakpoints([{ cats: 0 }, { dinosaurs: 900 }])
+
+&amp;#x3C;Breakpoint cats only&gt;
+  Only cats can render me 🐈
+&amp;#x3C;/Breakpoint&gt;
+&lt;/code&gt;&lt;/pre&gt;
+&lt;h4&gt;Reasons why you should use &lt;a href=&quot;https://github.com/flexdinesh/react-socks&quot;&gt;React Socks&lt;/a&gt;&lt;/h4&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;Render viewport specific&lt;/strong&gt; components without hassle&lt;/li&gt;
+&lt;li&gt;You can define your &lt;strong&gt;own breakpoints&lt;/strong&gt; (Eg. xs, ipad, bigmonitors) and use them&lt;/li&gt;
+&lt;li&gt;You can &lt;strong&gt;improve your app performance&lt;/strong&gt; if you lazy load your viewport specific components&lt;/li&gt;
+&lt;li&gt;Simpler and sweeter &lt;strong&gt;syntax&lt;/strong&gt; for ease of use&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;The library has been published to &lt;a href=&quot;https://www.npmjs.com/package/react-socks&quot;&gt;npm&lt;/a&gt; and is in alpha version. I&apos;d love to get your feedback and improve it before releasing the first stable version.&lt;/p&gt;
+&lt;p&gt;&lt;em&gt;Edit: The first stable version has been released on Dec 9, 2018 with performance improvements and SSR support.&lt;/em&gt; 🎉&lt;/p&gt;
+&lt;p&gt;If you&apos;re wondering &lt;strong&gt;why the name React Socks&lt;/strong&gt; 🤷‍♂️&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;&lt;a href=&quot;https://github.com/flexdinesh/react-socks&quot;&gt;React Socks&lt;/a&gt;&lt;/strong&gt; wraps your components comfortably to prevent unnecessary render in various viewports, just like how you wrap your feet with socks to prevent cold feet 🎉&lt;/p&gt;
+&lt;p&gt;Let&apos;s put some fancy &lt;a href=&quot;https://github.com/flexdinesh/react-socks&quot;&gt;React Socks&lt;/a&gt; on and wrap all the components 🔥&lt;/p&gt;
+&lt;p&gt;You are amazing! Have a great day! ⚡️&lt;/p&gt;</content:encoded></item><item><title><![CDATA[Render Browser Specific Content]]></title><description><![CDATA[This article is also cross-posted in — DEV - Render Browser Specific Content with React HackerNoon - Render Browser Specific Content with…]]></description><link>https://dineshpandiyan.com/render-browser-specific-content-with-react/</link><guid isPermaLink="false">https://dineshpandiyan.com/render-browser-specific-content-with-react/</guid><pubDate>Sun, 27 May 2018 00:00:00 GMT</pubDate><content:encoded>&lt;p&gt;This article is also cross-posted in —&lt;/p&gt;
+&lt;p&gt;DEV - &lt;a href=&quot;https://dev.to/flexdinesh/render-browser-specific-content-with-react--amm&quot;&gt;Render Browser Specific Content with React&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;HackerNoon - &lt;a href=&quot;https://hackernoon.com/render-browser-specific-content-with-react-2651cef68faf&quot;&gt;Render Browser Specific Content with React&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;codeburst - &lt;a href=&quot;https://codeburst.io/render-browser-specific-content-with-react-8bdb0b46966b&quot;&gt;Render Browser Specific Content with React&lt;/a&gt;&lt;/p&gt;
+&lt;hr&gt;
+&lt;p&gt;&lt;img src=&quot;https://image.ibb.co/c8WZ2d/browser_banner.png&quot; alt=&quot;Browser Banner&quot;&gt;
+&lt;em&gt;&lt;strong&gt;TL;DR&lt;/strong&gt; - You can render browser specific content in React with a one-liner.&lt;/em&gt;&lt;/p&gt;
+&lt;p&gt;Have you ever wanted to put up a banner for all your IE users and ask them to try your site in Chrome/Firefox?&lt;/p&gt;
+&lt;p&gt;With &lt;a href=&quot;https://github.com/flexdinesh/react-render-in-browser&quot;&gt;RenderInBrowser&lt;/a&gt; component you can &lt;strong&gt;render content specific to browsers&lt;/strong&gt;.&lt;/p&gt;
+&lt;p&gt;As promised in my &lt;a href=&quot;https://dev.to/flexdinesh/i-re-wrote-my-portfolio-and-added-some-magic-22n7&quot;&gt;post&lt;/a&gt; a few weeks back, I&apos;ve ported the code from my other project, wrote thorough tests and created a &lt;strong&gt;standalone React library&lt;/strong&gt; to render content only in specified browsers.&lt;/p&gt;
+&lt;p&gt;The syntax is too simple.&lt;/p&gt;
+&lt;p&gt;If you want to render something only in Chrome,&lt;/p&gt;
+&lt;pre&gt;&lt;code class=&quot;language-jsx&quot;&gt;&amp;#x3C;RenderInBrowser only chrome&gt;
+  &amp;#x3C;div&gt;Whoa! This super duper text line will be rendered only in Chrome!&amp;#x3C;/div&gt;
+&amp;#x3C;/RenderInBrowser&gt;
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;If you want to render something in all browsers except IE,&lt;/p&gt;
+&lt;pre&gt;&lt;code class=&quot;language-jsx&quot;&gt;&amp;#x3C;RenderInBrowser except ie&gt;
+  &amp;#x3C;div&gt;Darn, this stuff doesn&apos;t work in IE :(&amp;#x3C;/div&gt;
+&amp;#x3C;/RenderInBrowser&gt;
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;This library is available as an &lt;a href=&quot;https://www.npmjs.com/package/react-render-in-browser&quot;&gt;NPM package&lt;/a&gt; and is still in beta stage (v0.2.0) &apos;coz I&apos;d like to take feedback and improve on it before publishing &lt;strong&gt;v1.0.0&lt;/strong&gt;.&lt;/p&gt;
+&lt;p&gt;Here&apos;s the link to the &lt;a href=&quot;https://github.com/flexdinesh/react-render-in-browser&quot;&gt;GitHub repo&lt;/a&gt;.&lt;/p&gt;
+&lt;p&gt;If you find something that could be improved, pl drop a feedback note and I&apos;d very much welcome it. &lt;strong&gt;If you don&apos;t find anything that could be improved, you could still drop a &lt;em&gt;Hi&lt;/em&gt; and I&apos;ll &lt;em&gt;Hi&lt;/em&gt; you back :)&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;You are amazing! Have a good day! ⚡️&lt;/p&gt;</content:encoded></item><item><title><![CDATA[I Created My Portfolio with React and Some Magic]]></title><description><![CDATA[This article is also cross-posted in — DEV - I Created My Portfolio with React and Some Magic HackerNoon - I Created My Portfolio with React…]]></description><link>https://dineshpandiyan.com/portfolio-with-react/</link><guid isPermaLink="false">https://dineshpandiyan.com/portfolio-with-react/</guid><pubDate>Sun, 01 Apr 2018 00:00:00 GMT</pubDate><content:encoded>&lt;p&gt;This article is also cross-posted in —&lt;/p&gt;
+&lt;p&gt;DEV - &lt;a href=&quot;https://dev.to/flexdinesh/i-re-wrote-my-portfolio-and-added-some-magic-22n7&quot;&gt;I Created My Portfolio with React and Some Magic&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;HackerNoon - &lt;a href=&quot;https://hackernoon.com/i-created-my-portfolio-with-react-and-some-magic-fda27ba06a06&quot;&gt;I Created My Portfolio with React and Some Magic&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;codeburst - &lt;a href=&quot;https://codeburst.io/i-created-my-portfolio-with-react-and-some-magic-fe661302ce4c&quot;&gt;I Created My Portfolio with React and Some Magic&lt;/a&gt;&lt;/p&gt;
+&lt;hr&gt;
+&lt;p&gt;&lt;img src=&quot;https://image.ibb.co/erwyaS/portfolio.png&quot; alt=&quot;Dinesh Pandiyan - Dev Landing Page&quot;&gt;&lt;/p&gt;
+&lt;p&gt;&lt;em&gt;&lt;strong&gt;TL;DR&lt;/strong&gt; - I re-wrote my &lt;a href=&quot;https://flexdinesh.github.io&quot;&gt;portfolio&lt;/a&gt; in React and added some niche tricks to make it look all shiny and rad. Everytime you refresh the page, a new look will be loaded.&lt;/em&gt;&lt;/p&gt;
+&lt;p&gt;This whole write-up is based off this site - &lt;a href=&quot;https://flexdinesh.github.io/&quot;&gt;Dinesh Pandiyan | Web Dev&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;A few weeks back I created &lt;a href=&quot;https://github.com/flexdinesh/dev-landing-page&quot;&gt;Dev Landing Page&lt;/a&gt; and wrote a &lt;a href=&quot;https://dev.to/flexdinesh/create-your-developer-landing-page-with-github-pages---42jk&quot;&gt;blog post&lt;/a&gt; about it. In less than a week, the repo got over &lt;strong&gt;150 stars&lt;/strong&gt; and got featured in various articles. I guess people liked it. I created my portfolio on top of it.&lt;/p&gt;
+&lt;p&gt;I am no UI expert but in recent times I&apos;ve took a liking towards &lt;strong&gt;responsive design&lt;/strong&gt;, &lt;strong&gt;animations&lt;/strong&gt;, &lt;strong&gt;flexbox&lt;/strong&gt;, and other fancy CSS features. So I thought I&apos;d take my UI skills for a spin and build my portfolio along the way. While looking for inspiration, I stumbled across &lt;a href=&quot;https://dev.to/aspittel&quot;&gt;Ali Spittel&apos;s&lt;/a&gt; post &lt;a href=&quot;https://dev.to/aspittel/how-i-re-wrote-my-portfolio-site-cg&quot;&gt;How I Re-Wrote my Portfolio Site&lt;/a&gt;. &lt;a href=&quot;https://www.alispit.tel&quot;&gt;Her portfolio&lt;/a&gt; looks pretty darn awesome and gives you the &lt;em&gt;&apos;wow&apos;&lt;/em&gt; feel. I, then, embarked on a journey to build something that gives a similar vibe and a &lt;strong&gt;magical feel&lt;/strong&gt;.&lt;/p&gt;
+&lt;p&gt;I wanted to build everything &lt;strong&gt;from scratch without the help of any UI libraries/frameworks&lt;/strong&gt;, except &lt;strong&gt;React&lt;/strong&gt; though, because I love how React simplifies the whole web development process. I had so much fun building every single piece of my portfolio alongside learning so many new things. I&apos;m gonna list down a few of my favorite parts of the site and what I learnt from them.&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Flexbox Layout&lt;/li&gt;
+&lt;li&gt;Theme and React&apos;s context API&lt;/li&gt;
+&lt;li&gt;Responsive Design&lt;/li&gt;
+&lt;li&gt;Parallax Background&lt;/li&gt;
+&lt;li&gt;Animations&lt;/li&gt;
+&lt;li&gt;Browser Specific Code&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h2&gt;Flexbox Layout&lt;/h2&gt;
+&lt;p&gt;The whole website is laid out with &lt;strong&gt;Flexbox&lt;/strong&gt;.&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;Flexbox makes putting things in place so much easier&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;CSS Grid and Flexbox have been the talk of the town lately. Still the support for CSS Grid is not very good but almost all the &lt;em&gt;de-facto&lt;/em&gt; browsers today support flexbox. So I think it&apos;s pretty safe to implement the layout with Flexbox rather than Grid.&lt;/p&gt;
+&lt;p&gt;Flexbox is all about containers and children. I used this &lt;a href=&quot;http://yoksel.github.io/flex-cheatsheet/&quot;&gt;flex-cheatsheet&lt;/a&gt; as a reference while building the layout and things seem pretty straight forward.&lt;/p&gt;
+&lt;p&gt;One thing what bugs me about Flexbox is the &lt;code&gt;flex&lt;/code&gt; property. I have used,&lt;/p&gt;
+&lt;p&gt;&lt;code&gt;flex: 1 0 auto;&lt;/code&gt;&lt;/p&gt;
+&lt;p&gt;&lt;code&gt;flex: auto;&lt;/code&gt;&lt;/p&gt;
+&lt;p&gt;&lt;code&gt;flex: 1;&lt;/code&gt;&lt;/p&gt;
+&lt;p&gt;in a lot of places in the site but still couldn&apos;t figure out how it exactly behaves. Most of the times, it&apos;s a trial and error usage. Need to pick up on these properties and maybe I&apos;ll write a post about it soon.&lt;/p&gt;
+&lt;h2&gt;Theme and React&apos;s Context API&lt;/h2&gt;
+&lt;p&gt;While deciding on the theme for the site, I kept &lt;em&gt;juggling&lt;/em&gt; between two themes constantly. One day I&apos;d have one, then the other day I&apos;ll replace my Sass theme definitions with the other theme. Turns out, I couldn&apos;t pick one and wanted to have them both.&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;Then a crazy idea popped in my head&lt;/strong&gt; - &lt;em&gt;Why not have both and alternate between them?&lt;/em&gt;&lt;/p&gt;
+&lt;p&gt;I explored on ways to do it with React and settled on &lt;strong&gt;React&apos;s Context API&lt;/strong&gt;. We could easily argue to have Redux instead, but I have worked way too much with Redux and wanted to get my hands dirty with &lt;strong&gt;React without Redux&lt;/strong&gt;. Context API is a bit of a &lt;em&gt;non-ideal way to do things&lt;/em&gt; but it got the job done for me and I&apos;m happy with it. I will probably rewrite this with React 16.3&apos;s new Context API soon.&lt;/p&gt;
+&lt;p&gt;After playing around for a while, I ended up with &lt;strong&gt;16 awesome themes&lt;/strong&gt; - &lt;strong&gt;10 light themes&lt;/strong&gt; and &lt;strong&gt;6 dark themes&lt;/strong&gt;.&lt;/p&gt;
+&lt;p&gt;Of all these, &lt;strong&gt;1 of my 3 favorite themes will be applied when the site loads&lt;/strong&gt;. And when you click the &lt;strong&gt;magic wand&lt;/strong&gt;, &lt;strong&gt;1 of the 16 themes will be applied&lt;/strong&gt;.&lt;/p&gt;
+&lt;p&gt;Try and see if you could tell all 16 themes apart. Trust me, it&apos;s not that easy : )&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;&lt;em&gt;Everytime you refresh the page, a new look will be loaded. I gotta say, theme magic is my most favorite feature of the site&lt;/em&gt;&lt;/strong&gt; ✨&lt;/p&gt;
+&lt;h2&gt;Responsive Design&lt;/h2&gt;
+&lt;p&gt;&lt;strong&gt;Sass&lt;/strong&gt; could be a powerful tool if you know how to use it right. I recently started exploring &lt;strong&gt;Sass mixins&lt;/strong&gt; and it helped me design and refactor responsive layouts without breaking a sweat.&lt;/p&gt;
+&lt;p&gt;I have come up with standard, re-usable sass breakpoint mixins. You can find the entire mixin code here - &lt;a href=&quot;https://github.com/flexdinesh/flexdinesh.github.io/blob/dev/src/styles/_breakpoints.scss&quot;&gt;Sass breakpoint mixins&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;Writing media queries are a lot easier with these mixins.&lt;/p&gt;
+&lt;pre&gt;&lt;code class=&quot;language-scss&quot;&gt;.content-grid {
+  margin: 0 auto;
+  width: calc(100% - 5rem);
+
+  @include breakpoint-medium-up {
+    width: calc(100% - 5rem);
+  }
+
+  @include breakpoint-large-up {
+    width: calc(100% - 10rem);
+  }
+
+  @include breakpoint-xlarge-up {
+    width: calc(100% - 20rem);
+  }
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;h2&gt;Parallax Background&lt;/h2&gt;
+&lt;p&gt;I&apos;ve seen &lt;em&gt;parallax&lt;/em&gt; tagged posts and codepens quite a bit but never tried my hand at it. I got inspired from one of the codepens and ended up with my own version - &lt;a href=&quot;https://codepen.io/flexdinesh/full/GxNazP/&quot;&gt;Parallax Star background&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;This is not exactly &lt;em&gt;&apos;Parallax&apos;&lt;/em&gt; but more or less serves the purpose and creates a snowfall effect in the background.&lt;/p&gt;
+&lt;h2&gt;Animations&lt;/h2&gt;
+&lt;p&gt;I added a few animations to the site as well. You&apos;ll find the &lt;strong&gt;Scroll to next page&lt;/strong&gt; arrow bouncing up and down. You&apos;ll also find the &lt;strong&gt;Social Icons&lt;/strong&gt; &lt;em&gt;(GitHub, Twitter, LinkedIn, etc)&lt;/em&gt; bounce when you hover over them.&lt;/p&gt;
+&lt;p&gt;Somehow, bounce seems to be my favorite animation. &lt;em&gt;&apos;Parallax snowfall&apos;&lt;/em&gt; is also an animation but most of it is inspired work.&lt;/p&gt;
+&lt;h2&gt;Browser Specific Code&lt;/h2&gt;
+&lt;p&gt;While working with animations, I figured out that &lt;strong&gt;Safari does not support smooth scroll&lt;/strong&gt; and &lt;strong&gt;FireFox has glitches rendering the snowfall&lt;/strong&gt;. So I needed browser specific behavior and ended up creating a react component that renders code for specific browsers.&lt;/p&gt;
+&lt;p&gt;You can find the code for the component here - &lt;a href=&quot;https://github.com/flexdinesh/flexdinesh.github.io/tree/dev/src/components/Browser&quot;&gt;Browser Component&lt;/a&gt;. I&apos;m thinking about writing thorough test cases and open-sourcing this component sometime soon.&lt;/p&gt;
+&lt;p&gt;It&apos;s pretty neat to use the component like this.&lt;/p&gt;
+&lt;pre&gt;&lt;code class=&quot;language-html&quot;&gt;&amp;#x3C;Browser except firefox chrome mobile&gt;
+  &amp;#x3C;span&gt;All the magic tricks in this site work best in &amp;#x3C;b&gt;Chrome!&amp;#x3C;/b&gt;&amp;#x3C;/span&gt;
+&amp;#x3C;/Browser&gt;
+&amp;#x3C;Browser only firefox&gt;
+  &amp;#x3C;span&gt;Magic background is disabled in FireFox. Try in &amp;#x3C;b&gt;Chrome!&amp;#x3C;/b&gt;&amp;#x3C;/span&gt;
+&amp;#x3C;/Browser&gt;
+&lt;/code&gt;&lt;/pre&gt;
+&lt;h2&gt;Site is Up and Running&lt;/h2&gt;
+&lt;p&gt;I recently re-wrote my portfolio with GatsbyJS - &lt;a href=&quot;https://dineshpandiyan.com&quot;&gt;Portfolio v3&lt;/a&gt;
+I moved the portfolio mentioned in this post here - &lt;a href=&quot;https://portfoliov2.dineshpandiyan.com/&quot;&gt;Portfolio v2&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;Link to source code - &lt;a href=&quot;https://github.com/flexdinesh/flexdinesh.github.io/tree/dev&quot;&gt;React Codebase&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;I&apos;m still tweaking here and there. The portfolio section clearly needs an upgrade. But most of the design part is done. Feel free to drop a comment on what you think about the site and if there are things that could be improved.&lt;/p&gt;
+&lt;p&gt;You are amazing! Have a good day! ✨&lt;/p&gt;</content:encoded></item><item><title><![CDATA[Upgrade to Webpack 4]]></title><description><![CDATA[This article is also cross-posted in — DEV - Upgrade to Webpack 4 HackerNoon - Upgrade to Webpack 4 codeburst - Upgrade to Webpack 4 Upgrade…]]></description><link>https://dineshpandiyan.com/upgrade-to-webpack-4/</link><guid isPermaLink="false">https://dineshpandiyan.com/upgrade-to-webpack-4/</guid><pubDate>Mon, 12 Mar 2018 00:00:00 GMT</pubDate><content:encoded>&lt;p&gt;This article is also cross-posted in —&lt;/p&gt;
+&lt;p&gt;DEV - &lt;a href=&quot;https://dev.to/flexdinesh/upgrade-to-webpack-4---5bc5&quot;&gt;Upgrade to Webpack 4&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;HackerNoon - &lt;a href=&quot;https://hackernoon.com/upgrade-to-webpack-4-3ebb199aa9bf&quot;&gt;Upgrade to Webpack 4&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;codeburst - &lt;a href=&quot;https://codeburst.io/upgrade-to-webpack-4-78b40b5251d9&quot;&gt;Upgrade to Webpack 4&lt;/a&gt;&lt;/p&gt;
+&lt;hr&gt;
+&lt;p&gt;&lt;img src=&quot;https://image.ibb.co/n6oUYS/webpack_upgrade.png&quot; alt=&quot;Upgrade to Webpack 4&quot;&gt;&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;Webpack 4&lt;/strong&gt; &lt;em&gt;(codename Legato)&lt;/em&gt; was released two weeks back. And it is packed with a lot of shiny features. Unlike Webpack 3, which was not a major upgrade over its predecessor, Webpack 4 has a string of compelling features.&lt;/p&gt;
+&lt;p&gt;Major changes to look out for -&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;1. Reduced Build Time&lt;/strong&gt;
+The build time has gone down massively (more than 60%)&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;2. Zero configuration&lt;/strong&gt;
+You can now start using webpack with any project without any config file (introducing &lt;em&gt;mode&lt;/em&gt;)&lt;/p&gt;
+&lt;p&gt;I recently upgraded my &lt;a href=&quot;https://github.com/flexdinesh/react-redux-boilerplate&quot;&gt;React-Redux Boilerplate&lt;/a&gt; to Webpack 4. There are no clear docs out there for migration yet, so it took me quite some time and struggle to complete the upgrade. I am writing down everything I figured so it can help anyone who wants to upgrade.&lt;/p&gt;
+&lt;p&gt;The following are the config changes that need to be done.&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Mode&lt;/li&gt;
+&lt;li&gt;Plugins&lt;/li&gt;
+&lt;li&gt;Dependencies&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h2&gt;Mode&lt;/h2&gt;
+&lt;p&gt;Webpack 4 has two modes - &lt;em&gt;development&lt;/em&gt; and &lt;em&gt;production&lt;/em&gt;.&lt;/p&gt;
+&lt;p&gt;Previously we passed the flag &lt;code&gt;-p&lt;/code&gt; to the webpack command to run a production build. With Webpack 4, you should always pass in &lt;code&gt;mode&lt;/code&gt; option. You have two ways to pass in mode,&lt;/p&gt;
+&lt;h3&gt;1. Pass through npm script&lt;/h3&gt;
+&lt;p&gt;In your &lt;code&gt;package.json&lt;/code&gt; -&lt;/p&gt;
+&lt;pre&gt;&lt;code class=&quot;language-js&quot;&gt;&quot;build&quot;: &quot;webpack --config config/webpack.dev.config.js --mode development&quot;
+&quot;build:prod&quot;: &quot;webpack --config config/webpack.prod.config.js --mode production&quot;
+&lt;/code&gt;&lt;/pre&gt;
+&lt;h3&gt;2. Pass through config file&lt;/h3&gt;
+&lt;p&gt;In your &lt;code&gt;webpack.dev.config.js&lt;/code&gt;&lt;/p&gt;
+&lt;pre&gt;&lt;code class=&quot;language-js&quot;&gt;mode: &apos;development&apos;
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;In your &lt;code&gt;webpack.prod.config.js&lt;/code&gt;&lt;/p&gt;
+&lt;pre&gt;&lt;code class=&quot;language-js&quot;&gt;mode: &apos;production&apos;
+&lt;/code&gt;&lt;/pre&gt;
+&lt;h2&gt;Plugins&lt;/h2&gt;
+&lt;p&gt;The following plugins have been removed from Webpack 4 which were extensively used in previous versions.&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;NoEmitOnErrorsPlugin&lt;/li&gt;
+&lt;li&gt;ModuleConcatenationPlugin&lt;/li&gt;
+&lt;li&gt;NamedModulesPlugin&lt;/li&gt;
+&lt;li&gt;CommonsChunkPlugin&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;Now instead, the configuration of these plugins should go inside the key &lt;code&gt;optimization&lt;/code&gt; in the &lt;code&gt;config file&lt;/code&gt; with their corresponding options.&lt;/p&gt;
+&lt;p&gt;This snippet might give you more info&lt;/p&gt;
+&lt;pre&gt;&lt;code class=&quot;language-js&quot;&gt;plugins: [
+    // new webpack.NamedModulesPlugin(), =&gt; not used like this anymore
+    // new webpack.NoEmitOnErrorsPlugin(), =&gt; not used like this anymore
+    // new webpack.optimize.CommonsChunkPlugin({ =&gt; not used like this anymore
+        // name: &apos;vendor&apos;,
+        // children: true,
+        // minChunks: 2,
+        // async: true,
+    // }),
+    // new webpack.optimize.ModuleConcatenationPlugin(), =&gt; not used like this anymore
+],
+
+optimization: {
+    namedModules: true, // NamedModulesPlugin()
+    splitChunks: { // CommonsChunkPlugin()
+        name: &apos;vendor&apos;,
+        minChunks: 2
+    },
+    noEmitOnErrors: true, // NoEmitOnErrorsPlugin
+    concatenateModules: true //ModuleConcatenationPlugin
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;h2&gt;Dependencies&lt;/h2&gt;
+&lt;p&gt;If you&apos;re using dependencies like &lt;code&gt;webpack-hot-middleware&lt;/code&gt; and &lt;code&gt;image-webpack-loader&lt;/code&gt;, make sure you upgrade them as well. I ran into a weird issue with &lt;code&gt;webpack-hot-middleware&lt;/code&gt; but once I upgraded it to the latest version, it got resolved automatically.&lt;/p&gt;
+&lt;p&gt;You can refer to this &lt;a href=&quot;https://github.com/flexdinesh/react-redux-boilerplate/commit/69dc839ad84c37b170e4c3d6f1f8ecb735fc2791&quot;&gt;commit&lt;/a&gt; in &lt;a href=&quot;https://github.com/flexdinesh/react-redux-boilerplate&quot;&gt;React-Redux Boilerplate&lt;/a&gt; for reference.&lt;/p&gt;
+&lt;p&gt;Webpack 4 is great in so many ways. But the lack of docs for upgrade is a bummer. But then, we&apos;re all amazing problem solvers, so we don&apos;t mind.&lt;/p&gt;
+&lt;p&gt;If you&apos;re planning to upgrade to Webpack 4, don&apos;t think twice, your dev experience will definitely multifold. God Speed!&lt;/p&gt;
+&lt;p&gt;Have a nice day! ✨&lt;/p&gt;</content:encoded></item><item><title><![CDATA[React-Redux Boilerplate with Best Practices]]></title><description><![CDATA[This article is also cross-posted in — DEV - React-Redux Boilerplate with Best Practices HackerNoon - React-Redux Boilerplate with Best…]]></description><link>https://dineshpandiyan.com/react-redux-boilerplate/</link><guid isPermaLink="false">https://dineshpandiyan.com/react-redux-boilerplate/</guid><pubDate>Sun, 11 Mar 2018 00:00:00 GMT</pubDate><content:encoded>&lt;p&gt;This article is also cross-posted in —&lt;/p&gt;
+&lt;p&gt;DEV - &lt;a href=&quot;https://dev.to/flexdinesh/react-redux-boilerplate-with-best-practices--2pp5&quot;&gt;React-Redux Boilerplate with Best Practices&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;HackerNoon - &lt;a href=&quot;https://hackernoon.com/react-redux-boilerplate-with-best-practices-518909659f4d&quot;&gt;React-Redux Boilerplate with Best Practices&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;codeburst - &lt;a href=&quot;https://codeburst.io/react-redux-boilerplate-with-best-practices-30c3fd8cc434&quot;&gt;React-Redux Boilerplate with Best Practices&lt;/a&gt;&lt;/p&gt;
+&lt;hr&gt;
+&lt;p&gt;&lt;img src=&quot;https://raw.githubusercontent.com/flexdinesh/react-redux-boilerplate/master/app/components/Header/images/banner.jpg&quot; alt=&quot;React-Redux Boilerplate&quot;&gt;&lt;/p&gt;
+&lt;p&gt;&lt;em&gt;TL;DR: There&apos;s an amazing &lt;a href=&quot;https://github.com/flexdinesh/react-redux-boilerplate&quot;&gt;React-Redux Boilerplate&lt;/a&gt;. This post is based on what I learnt from setting it up.&lt;/em&gt;&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;React&lt;/strong&gt; has been quite the talk of the town lately and everyone wants to get their hands on it. After playing around with React for a few months now, I have to say, &lt;em&gt;React makes the whole web development process, a lot easier&lt;/em&gt;. To know more about React, go through this article - &lt;a href=&quot;https://medium.freecodecamp.org/yes-react-is-taking-over-front-end-development-the-question-is-why-40837af8ab76&quot;&gt;React taking over the front-end&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;Redux&lt;/strong&gt; on the other hand, is a &lt;em&gt;predictable state container&lt;/em&gt; for your React application. It helps abstracting and controlling the data flow in your application. It&apos;s quite an in-depth concept. To know more about Redux, go through this article - &lt;a href=&quot;https://medium.freecodecamp.org/why-redux-makes-sense-to-me-and-how-i-conceptualize-it-c8a3a9db15ca&quot;&gt;Making sense of Redux
+&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;Most of us, when we want to learn something new, or want to start a new project with a framework, we usually start scouting the internet looking for a reliable starter template/boilerplate setup with all the best practices.&lt;/strong&gt;&lt;/p&gt;
+&lt;h2&gt;The Original React Boilerplate&lt;/h2&gt;
+&lt;p&gt;After messing around with React/Redux for quite some time I wanted to start my own React project. After a quick search, I found out this amazing &lt;a href=&quot;https://github.com/react-boilerplate/react-boilerplate&quot;&gt;React Boilerplate&lt;/a&gt;. If you&apos;ve been a React dev for quite some time, you&apos;d probably know about this boilerplate already. It was created by &lt;a href=&quot;https://twitter.com/mxstbr&quot;&gt;Max Stoiber&lt;/a&gt; and maintained by a battalion of amazing React Devs worldwide. But when I started out with the boilerplate I found it to be a bit over-engineered for a starter template. That&apos;s because the boilerplate was built to be production ready and &lt;strong&gt;not developer friendly&lt;/strong&gt;. They say this right in their GitHub Readme&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;Please note that this boilerplate is production-ready and not meant for beginners! If you&apos;re just starting out with react or redux, please refer to &lt;a href=&quot;https://github.com/petehunt/react-howto&quot;&gt;https://github.com/petehunt/react-howto&lt;/a&gt; instead. If you want a solid, battle-tested base to build your next product upon and have some experience with react, this is the perfect start for you.&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;h2&gt;The Minimal React Boilerplate&lt;/h2&gt;
+&lt;p&gt;So I spent quite some time and stripped down the original all-star React Boilerplate, removed all the &lt;em&gt;you-arent-gonna-need-it&lt;/em&gt; (&lt;a href=&quot;https://en.wikipedia.org/wiki/You_aren%27t_gonna_need_it&quot;&gt;YAGNI&lt;/a&gt;) stuff and created a &lt;strong&gt;beginner friendly minimal boilerplate&lt;/strong&gt;. It has been setup with all the &lt;strong&gt;best practices&lt;/strong&gt; and quite easy to quickly bootstrap a React based project. I find it very helpful personally and I think it might help a lot other React devs out there as well. Here&apos;s the link,&lt;/p&gt;
+&lt;p&gt;&lt;a href=&quot;https://github.com/flexdinesh/react-redux-boilerplate&quot;&gt;React-Redux Boilerplate&lt;/a&gt; 🎉&lt;/p&gt;
+&lt;p&gt;Feel free to fork/clone and play around if you must. And if you think there&apos;s space for improvement (there always is), do let me know, so we could fortify this boilerplate and make it even better.&lt;/p&gt;
+&lt;p&gt;You are amazing! Have a good day! ✨&lt;/p&gt;</content:encoded></item><item><title><![CDATA[Publish your own NPM package]]></title><description><![CDATA[This article is also cross-posted in — DEV - Publish your own NPM package HackerNoon - Publish your own NPM package codeburst - Publish your…]]></description><link>https://dineshpandiyan.com/publish-your-own-npm-package/</link><guid isPermaLink="false">https://dineshpandiyan.com/publish-your-own-npm-package/</guid><pubDate>Mon, 05 Mar 2018 00:00:00 GMT</pubDate><content:encoded>&lt;p&gt;This article is also cross-posted in —&lt;/p&gt;
+&lt;p&gt;DEV - &lt;a href=&quot;https://dev.to/flexdinesh/publish-your-own-npm-package---5b71&quot;&gt;Publish your own NPM package&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;HackerNoon - &lt;a href=&quot;https://hackernoon.com/publish-your-own-npm-package-946b19df577e&quot;&gt;Publish your own NPM package&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;codeburst - &lt;a href=&quot;https://codeburst.io/publish-your-own-npm-package-ff918698d450&quot;&gt;Publish your own NPM package&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;It has been featured in —&lt;/p&gt;
+&lt;p&gt;JSK Weekly - March 14, 2018 (Email Newsletter)&lt;/p&gt;
+&lt;hr&gt;
+&lt;p&gt;&lt;img src=&quot;https://i.ytimg.com/vi/rTsz09zRuTU/maxresdefault.jpg&quot; alt=&quot;Publish your own NPM package&quot;&gt;&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;&lt;em&gt;Note: There&apos;s an amazing boilerplate for &lt;a href=&quot;https://github.com/flexdinesh/npm-module-boilerplate&quot;&gt;npm modules&lt;/a&gt;. This post is based on what I learned from setting it up.&lt;/em&gt;&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;NPM has been become the de-facto registry for javascript libraries these days.  Especially with React, Angular and other front-end libraries ruling the web and node.js taking over the server side, &lt;em&gt;NPM packages are more popular than ever now&lt;/em&gt;. Often we import amazing utilities like &lt;a href=&quot;https://github.com/flexdinesh/typy&quot;&gt;typy&lt;/a&gt;, &lt;a href=&quot;https://github.com/andrewplummer/Sugar&quot;&gt;sugar&lt;/a&gt; in our code and use them without any hassle.&lt;/p&gt;
+&lt;p&gt;But have you ever wondered about writing your &lt;strong&gt;own utility/library&lt;/strong&gt; and publishing it to NPM so you, along with the entire world can re-use it anywhere? If yes, then keep reading. ✨&lt;/p&gt;
+&lt;p&gt;We&apos;ll go through the following sections in this post.&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;Why?&lt;/li&gt;
+&lt;li&gt;Steps to Publish&lt;/li&gt;
+&lt;li&gt;Boilerplate&lt;/li&gt;
+&lt;/ol&gt;
+&lt;h2&gt;Why?&lt;/h2&gt;
+&lt;p&gt;When you&apos;re working across multiple projects, you&apos;ll often find yourself repeating simple things in more than one project. An example would be, parsing a date in your preferred way and formatting it. Most devs just copy the code from one project and use it in another as it&apos;s just a few lines of code. But the better approach would be to extract that code and put it in a common place so you can access it from any project. NPM is a ideal and ever-growing ecosystem and it&apos;s free to use. So publishing all your reusable code as npm packages will help you in the long run. &lt;/p&gt;
+&lt;p&gt;&lt;em&gt;No matter how small the code is, be it one line or a thousand lines, publish it as a package so it can be easily consumed in more than one codebase.&lt;/em&gt;&lt;/p&gt;
+&lt;p&gt;Also, you get to become an &lt;strong&gt;author&lt;/strong&gt; of a library. How cool is that! 😎&lt;/p&gt;
+&lt;h2&gt;Steps to Publish&lt;/h2&gt;
+&lt;p&gt;Publishing usually is a simple process.&lt;/p&gt;
+&lt;p&gt;&lt;code&gt;code =&gt; test =&gt; publish =&gt; revise code =&gt; test =&gt; publish new version ...&lt;/code&gt;&lt;/p&gt;
+&lt;h3&gt;Entry&lt;/h3&gt;
+&lt;p&gt;Create a new directory and enter the following command from terminal.&lt;/p&gt;
+&lt;pre&gt;&lt;code class=&quot;language-js&quot;&gt;npm init
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Enter meaningful name and appropriate details for your package. This will create the &lt;code&gt;package.json&lt;/code&gt; for you. All NPM packages need &lt;code&gt;main&lt;/code&gt; key. This defines the &lt;strong&gt;entry point&lt;/strong&gt; to our library. By default this will be &lt;code&gt;index.js&lt;/code&gt; but you can change it whatever you want your entry point to be.&lt;/p&gt;
+&lt;p&gt;&lt;em&gt;For Babel or bundle based libraries, the entry point will usually be in the build dir.&lt;/em&gt;&lt;/p&gt;
+&lt;h3&gt;Source&lt;/h3&gt;
+&lt;p&gt;If you are writing a small library, you can put all your code into &lt;code&gt;index.js&lt;/code&gt;. But more often, we will abstract our code and put it into separate files. So the ideal approach is to keep all your source code in &lt;code&gt;src&lt;/code&gt; dir.&lt;/p&gt;
+&lt;p&gt;This is the most widely used and recommended setup for source code nowadays, although it varies from one library to other.&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;ES6&lt;/strong&gt; - &lt;a href=&quot;https://github.com/gotwarlost/istanbul&quot;&gt;Babel&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Linting&lt;/strong&gt; - &lt;a href=&quot;https://eslint.org/&quot;&gt;ESLint&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Code formatting&lt;/strong&gt; - Beautify/&lt;a href=&quot;https://github.com/prettier/prettier&quot;&gt;Prettier&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Bundling&lt;/strong&gt; - &lt;a href=&quot;https://webpack.js.org&quot;&gt;Webpack&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;Most of you already know about these things, so I am going to leave it out for you to figure out. &lt;/p&gt;
+&lt;h3&gt;Test&lt;/h3&gt;
+&lt;p&gt;You need to have thorough tests to make sure your code works as expected. There are various testing setups. You can use whichever suits your need best. Although, widely used test setups are&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;JavaScript Utility - &lt;a href=&quot;https://mochajs.org/&quot;&gt;Mocha&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;React Library - &lt;a href=&quot;https://facebook.github.io/jest/&quot;&gt;Jest&lt;/a&gt; with &lt;a href=&quot;https://github.com/airbnb/enzyme&quot;&gt;Enzyme&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;Angular Library - &lt;a href=&quot;https://karma-runner.github.io/2.0/index.html&quot;&gt;Karma&lt;/a&gt; with &lt;a href=&quot;https://jasmine.github.io/&quot;&gt;Jasmine&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;... and much more&lt;/p&gt;
+&lt;p&gt;If you also need &lt;strong&gt;code coverage&lt;/strong&gt;, &lt;em&gt;which I am a huge fan of&lt;/em&gt;, &lt;em&gt;&lt;a href=&quot;https://github.com/gotwarlost/istanbul&quot;&gt;Istanbul&lt;/a&gt;&lt;/em&gt; is one of the best coverage tools for any JavaScript project. I absolutely love it.&lt;/p&gt;
+&lt;h3&gt;Publish&lt;/h3&gt;
+&lt;p&gt;Once your code is thoroughly tested, it is ready to be published.&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;Create an account in &lt;a href=&quot;https://www.npmjs.com&quot;&gt;npmjs.com&lt;/a&gt;.&lt;/li&gt;
+&lt;li&gt;Run this command from the terminal&lt;/li&gt;
+&lt;/ol&gt;
+&lt;pre&gt;&lt;code class=&quot;language-js&quot;&gt;npm login
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Enter your username and password. This will store the credentials so you don&apos;t have to enter it for every publish.&lt;/p&gt;
+&lt;p&gt;&lt;em&gt;Edit: Pl ensure using &lt;a href=&quot;https://docs.npmjs.com/getting-started/using-two-factor-authentication&quot;&gt;npm&apos;s 2FA&lt;/a&gt; to secure your packages from being hacked as mentioned by &lt;a href=&quot;https://dev.to/nickytonline&quot;&gt;Nick Taylor&lt;/a&gt; in the &lt;a href=&quot;https://dev.to/nickytonline/comment/2fo1&quot;&gt;comments&lt;/a&gt;.&lt;/em&gt;&lt;/p&gt;
+&lt;ol start=&quot;3&quot;&gt;
+&lt;li&gt;Now to publish, run&lt;/li&gt;
+&lt;/ol&gt;
+&lt;pre&gt;&lt;code class=&quot;language-js&quot;&gt;npm publish
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;This will publish your package to NPM registry. Once publish completes(in less than a minute), you can go check your package in the link &lt;code&gt;https://www.npmjs.com/~{username}/{package-name}&lt;/code&gt;.&lt;/p&gt;
+&lt;p&gt;If you want to make changes to your package, you have to change the version number and publish again.&lt;/p&gt;
+&lt;p&gt;Remember to use npm commands &lt;code&gt;npm version patch&lt;/code&gt;, &lt;code&gt;npm version minor&lt;/code&gt; and &lt;code&gt;npm version major&lt;/code&gt; to update the version automatically rather than manually updating them. These commands are based on &lt;a href=&quot;https://docs.npmjs.com/getting-started/semantic-versioning&quot;&gt;semantic versioning&lt;/a&gt;.&lt;/p&gt;
+&lt;h2&gt;Boilerplate&lt;/h2&gt;
+&lt;p&gt;I have a few npm packages of my own and researched enough online on all the &lt;strong&gt;best practices&lt;/strong&gt; for creating NPM packages and created a &lt;strong&gt;boilerplate&lt;/strong&gt; specifically for this. It has everything pre-setup and you can &lt;strong&gt;get started in seconds&lt;/strong&gt;. If you&apos;re looking to write JavaScript util packages, it might just be the boilerplate for you.&lt;/p&gt;
+&lt;p&gt;Link to Boilerplate - &lt;a href=&quot;https://github.com/flexdinesh/npm-module-boilerplate&quot;&gt;npm-module-boilerplate&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;You are amazing! Have a fantastic day! 🎉&lt;/p&gt;</content:encoded></item><item><title><![CDATA[Short Circuit Assignment in JavaScript]]></title><description><![CDATA[This article is also cross-posted in — DEV - Short Circuit Assignment in JavaScript JS short circuit assignment tldr; Assign default value…]]></description><link>https://dineshpandiyan.com/short-circuit-assignment-in-javascript/</link><guid isPermaLink="false">https://dineshpandiyan.com/short-circuit-assignment-in-javascript/</guid><pubDate>Sat, 17 Feb 2018 00:00:00 GMT</pubDate><content:encoded>&lt;p&gt;This article is also cross-posted in —&lt;/p&gt;
+&lt;p&gt;DEV - &lt;a href=&quot;https://dev.to/flexdinesh/short-circuit-assignment-in-javascript--4k80&quot;&gt;Short Circuit Assignment in JavaScript&lt;/a&gt;&lt;/p&gt;
+&lt;hr&gt;
+&lt;p&gt;&lt;img src=&quot;https://image.ibb.co/c9duVn/short_circuit_alt.jpg&quot; alt=&quot;JS short circuit assignment&quot;&gt;&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;tldr;&lt;/strong&gt; &lt;em&gt;Assign default value to a variable using short circuit evaluation, when expected value is not found.&lt;/em&gt;&lt;/p&gt;
+&lt;p&gt;JavaScript is amazing. But most of the times we end up scratching our heads for accomplishing a simple task, like, &lt;em&gt;assigning a default value to a variable when the expected value is not found (probably null/undefined).&lt;/em&gt;&lt;/p&gt;
+&lt;p&gt;Let&apos;s take this example,&lt;/p&gt;
+&lt;pre&gt;&lt;code class=&quot;language-js&quot;&gt;const person = {
+    name: &apos;Jack&apos;
+};
+
+const name = person.name;
+const greetings = &apos;Hello&apos; + &apos;, &apos; + name + &apos;!&apos;;
+console.log(greetings) // =&gt; &apos;Hello, Jack!&apos;
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Now if the name key is not available in person object,&lt;/p&gt;
+&lt;pre&gt;&lt;code class=&quot;language-js&quot;&gt;const person = {};
+
+const name = person.name; // name is undefined here
+const greetings = &apos;Hello&apos; + &apos;, &apos; + name + &apos;!&apos;;
+console.log(greetings) // =&gt; &apos;Hello, undefined!&apos;
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;This problem is very common in JavaScript world. We usually tackle scenarios like this by assigning default values.&lt;/p&gt;
+&lt;pre&gt;&lt;code class=&quot;language-js&quot;&gt;// we either use if case
+let name = &apos;Sunshine&apos;; // default value
+if (person &amp;#x26;&amp;#x26; person.name) {
+    name = person.name;
+}
+
+// or we use ternary operator
+const name = person &amp;#x26;&amp;#x26; person.name ? person.name : &apos;Sunshine&apos;;
+
+const greetings = &apos;Hello&apos; + &apos;, &apos; + name + &apos;!&apos;; // name will never be undefined now
+console.log(greetings) // =&gt; &apos;Hello, Jack!&apos;
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;The above case was a simple scenario because we had to check only one variable. But if we need to assign based on multiple variables, then we end up writing messy &lt;em&gt;not-easy-to-read&lt;/em&gt; code.&lt;/p&gt;
+&lt;pre&gt;&lt;code class=&quot;language-js&quot;&gt;let foo, bar, baz;
+
+// if case mess
+let name;
+if (foo) name = foo;
+else if (bar) name = bar;
+else if (baz) name = baz;
+else name = &apos;Sunshine&apos;;
+
+// ternary operator nightmare
+const name = foo ? foo : (bar ? bar : (baz ? baz : &apos;Sunshine&apos;));
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;To save the world from messy code, &lt;strong&gt;there&apos;s one more &lt;em&gt;sweeter&lt;/em&gt; trick to assign default values.&lt;/strong&gt;&lt;/p&gt;
+&lt;h2&gt;Short Circuit Assignment ✨&lt;/h2&gt;
+&lt;p&gt;This is a shorter and cleaner way of assigning default values in JavaScript. This works based on short-circuit evaluation of logical operators where the &lt;strong&gt;first &lt;em&gt;truthy&lt;/em&gt; value is returned&lt;/strong&gt;.&lt;/p&gt;
+&lt;pre&gt;&lt;code class=&quot;language-js&quot;&gt;const name = person.name || &apos;Sunshine&apos;;
+
+// if you&apos;re not sure if person object is defined
+const name = (person &amp;#x26;&amp;#x26; person.name) || &apos;Sunshine&apos;;
+
+// can be used with as many variables as needed
+let foo, bar, baz;
+bar = &apos;Bar-da-Jack&apos;;
+// first truthy value will be assigned to name
+const name = foo || bar || baz || &apos;John&apos;; // =&gt; name = &apos;Bar-da-Jack&apos;
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;The evaluation circuit breaks when a truthy value is found, and is returned to the assignment. &lt;/p&gt;
+&lt;p&gt;Any value which is not &lt;code&gt;false&lt;/code&gt;, &lt;code&gt;0&lt;/code&gt;, &lt;code&gt;&apos;&apos;&lt;/code&gt;, &lt;code&gt;&quot;&quot;&lt;/code&gt;, &lt;code&gt;null&lt;/code&gt;, &lt;code&gt;undefined&lt;/code&gt; and &lt;code&gt;NaN&lt;/code&gt; is considered to be truthy in JavaScript.&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;Note:&lt;/strong&gt; &lt;em&gt;Keep in mind, if you&apos;re expecting &lt;code&gt;0&lt;/code&gt; as a value in a variable, this trick might not work as expected, as &lt;code&gt;0&lt;/code&gt; is considered falsy in JavaScript.&lt;/em&gt;&lt;/p&gt;
+&lt;p&gt;So, fellow comrades, short-circuit and save the JavaScript world from messy code structures, one line at a time! 🎉&lt;/p&gt;</content:encoded></item><item><title><![CDATA[Accessing Nested Objects in JavaScript]]></title><description><![CDATA[This article is also cross-posted in — DEV - Accessing Nested Objects in JavaScript HackerNoon - Accessing Nested Objects in JavaScript…]]></description><link>https://dineshpandiyan.com/accessing-nested-objects-in-javascript/</link><guid isPermaLink="false">https://dineshpandiyan.com/accessing-nested-objects-in-javascript/</guid><pubDate>Sat, 10 Feb 2018 00:00:00 GMT</pubDate><content:encoded>&lt;p&gt;This article is also cross-posted in —&lt;/p&gt;
+&lt;p&gt;DEV - &lt;a href=&quot;https://dev.to/flexdinesh/accessing-nested-objects-in-javascript--9m4&quot;&gt;Accessing Nested Objects in JavaScript&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;HackerNoon - &lt;a href=&quot;https://hackernoon.com/accessing-nested-objects-in-javascript-f02f1bd6387f&quot;&gt;Accessing Nested Objects in JavaScript&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;codeburst - &lt;a href=&quot;https://codeburst.io/accessing-nested-objects-in-javascript-c2ed249fe576&quot;&gt;Accessing Nested Objects in JavaScript&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;It has been featured in —&lt;/p&gt;
+&lt;p&gt;DEV - &lt;a href=&quot;https://dev.to/thepracticaldev/the-7-most-popular-dev-posts-from-the-past-week--31m3&quot;&gt;The 7 Most Popular DEV Posts from the Past Week&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;codeburst - &lt;a href=&quot;https://codeburst.io/top-web-software-development-articles-march-1-2018-51ed35890abd&quot;&gt;Top Web &amp;#x26; Software Development Articles — March 1, 2018&lt;/a&gt;&lt;/p&gt;
+&lt;hr&gt;
+&lt;p&gt;&lt;img src=&quot;https://image.ibb.co/i3ybGS/undefined_access.jpg&quot; alt=&quot;undefined error in JavaScript&quot;&gt;&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;tldr;&lt;/strong&gt; &lt;em&gt;safely access nested objects in JavaScript in a super cool way.&lt;/em&gt;&lt;/p&gt;
+&lt;p&gt;JavaScript is amazing, we all know that already. But a few things in JavaScript are really weird and they make us scratch our heads a lot. One of those things is the confrontation with this error when you try to access a nested object,&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;&lt;em&gt;Cannot read property &apos;foo&apos; of undefined&lt;/em&gt;&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;Most of the times when we&apos;re working with JavaScript, we&apos;ll be dealing with nested objects and often we&apos;ll be needing to access the innermost nested values safely.&lt;/p&gt;
+&lt;p&gt;Let&apos;s take this nested object as an example.&lt;/p&gt;
+&lt;pre&gt;&lt;code class=&quot;language-js&quot;&gt;const user = {
+  id: 101,
+  email: &apos;jack@dev.com&apos;,
+  personalInfo: {
+    name: &apos;Jack&apos;,
+    address: {
+      line1: &apos;westwish st&apos;,
+      line2: &apos;washmasher&apos;,
+      city: &apos;wallas&apos;,
+      state: &apos;WX&apos;,
+    },
+  },
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;To access the name of the our user, we&apos;ll write&lt;/p&gt;
+&lt;pre&gt;&lt;code class=&quot;language-js&quot;&gt;const name = user.personalInfo.name
+const userCity = user.personalInfo.address.city
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;This is easy and straight-forward.&lt;/p&gt;
+&lt;p&gt;But, for some reason, if our user&apos;s personal info is not available, the object structure will be like this,&lt;/p&gt;
+&lt;pre&gt;&lt;code class=&quot;language-js&quot;&gt;const user = {
+  id: 101,
+  email: &apos;jack@dev.com&apos;,
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Now if you try you access the name, you&apos;ll be thrown &lt;em&gt;Cannot read property &apos;name&apos; of undefined&lt;/em&gt;.&lt;/p&gt;
+&lt;pre&gt;&lt;code class=&quot;language-js&quot;&gt;const name = user.personalInfo.name // Cannot read property &apos;name&apos; of undefined
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;This is because we&apos;re trying to access &lt;code&gt;name&lt;/code&gt; key from an object that does not exist.&lt;/p&gt;
+&lt;p&gt;The usual way how most devs deal with this scenario is,&lt;/p&gt;
+&lt;pre&gt;&lt;code class=&quot;language-js&quot;&gt;const name = user &amp;#x26;&amp;#x26; user.personalInfo ? user.personalInfo.name : null
+// undefined error will NOT be thrown as we check for existence before access
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;This is okay if your nested structure is simple, but if you have your data nested 5 or 6 levels deep, then your code will look really messy like this,&lt;/p&gt;
+&lt;pre&gt;&lt;code class=&quot;language-js&quot;&gt;let city
+if (
+  data &amp;#x26;&amp;#x26;
+  data.user &amp;#x26;&amp;#x26;
+  data.user.personalInfo &amp;#x26;&amp;#x26;
+  data.user.personalInfo.addressDetails &amp;#x26;&amp;#x26;
+  data.user.personalInfo.addressDetails.primaryAddress
+) {
+  city = data.user.personalInfo.addressDetails.primaryAddress
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;There are a few tricks to deal with this messy object structures.&lt;/p&gt;
+&lt;h2&gt;Oliver Steele&apos;s Nested Object Access Pattern&lt;/h2&gt;
+&lt;p&gt;This is my personal favorite as it makes the code look &lt;em&gt;clean&lt;/em&gt; and &lt;em&gt;simple&lt;/em&gt;. I picked this style from stackoverflow a while back and it is pretty catchy once you understand how it works.&lt;/p&gt;
+&lt;pre&gt;&lt;code class=&quot;language-js&quot;&gt;const name = ((user || {}).personalInfo || {}).name
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;With this notation, you&apos;ll never run into &lt;em&gt;Cannot read property &apos;name&apos; of undefined&lt;/em&gt;. You basically check if user exists, if not, you create an empty object on the fly. This way, the next level key will &lt;strong&gt;always be accessed from an object that exists or an empty object&lt;/strong&gt;, but never from undefined.&lt;/p&gt;
+&lt;p&gt;Unfortunately, &lt;strong&gt;you cannot access nested arrays with this trick&lt;/strong&gt;&lt;/p&gt;
+&lt;h2&gt;Access Nested Objects Using Array Reduce&lt;/h2&gt;
+&lt;p&gt;Array reduce method is very powerful and it can be used to safely access nested objects.&lt;/p&gt;
+&lt;pre&gt;&lt;code class=&quot;language-js&quot;&gt;const getNestedObject = (nestedObj, pathArr) =&gt; {
+  return pathArr.reduce(
+    (obj, key) =&gt; (obj &amp;#x26;&amp;#x26; obj[key] !== &apos;undefined&apos; ? obj[key] : undefined),
+    nestedObj
+  )
+}
+
+// pass in your object structure as array elements
+const name = getNestedObject(user, [&apos;personalInfo&apos;, &apos;name&apos;])
+
+// to access nested array, just pass in array index as an element the path array.
+const city = getNestedObject(user, [&apos;personalInfo&apos;, &apos;addresses&apos;, 0, &apos;city&apos;])
+// this will return the city from the first address item.
+&lt;/code&gt;&lt;/pre&gt;
+&lt;h2&gt;Typy&lt;/h2&gt;
+&lt;p&gt;If you think the above methods are a lil&apos; too mainstream, then you should try &lt;a href=&quot;https://github.com/flexdinesh/typy&quot;&gt;Typy&lt;/a&gt; library that I&apos;ve written. In addition to safely accessing nested objects, it does many more awesome things. 🎉&lt;/p&gt;
+&lt;p&gt;It is available as an npm package - &lt;a href=&quot;https://www.npmjs.com/package/typy&quot;&gt;Typy&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;If you use &lt;strong&gt;Typy&lt;/strong&gt;, your code will look like this,&lt;/p&gt;
+&lt;pre&gt;&lt;code class=&quot;language-js&quot;&gt;import t from &apos;typy&apos;
+
+const name = t(user, &apos;personalInfo.name&apos;).safeObject
+const city = t(user, &apos;personalInfo.addresses[0].city&apos;).safeObject
+// address is an array
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;em&gt;Edit: There a few other libraries like Lodash and Ramda that can do this. But in light-weight front-end projects, especially if you&apos;re going to need only one or two methods from those libs, it&apos;s a good idea to opt for an alternative light-weight lib, or better, write your own.&lt;/em&gt;&lt;/p&gt;
+&lt;p&gt;Happy &apos;safely accessing nested objects in JavaScript&apos;! 💥&lt;/p&gt;</content:encoded></item><item><title><![CDATA[Create your developer landing page with GitHub Pages]]></title><description><![CDATA[This article is also cross-posted in — DEV - Create your developer landing page with GitHub Pages HackerNoon - Create your developer landing…]]></description><link>https://dineshpandiyan.com/dev-landing-page-with-github-pages/</link><guid isPermaLink="false">https://dineshpandiyan.com/dev-landing-page-with-github-pages/</guid><pubDate>Fri, 09 Feb 2018 00:00:00 GMT</pubDate><content:encoded>&lt;p&gt;This article is also cross-posted in —&lt;/p&gt;
+&lt;p&gt;DEV - &lt;a href=&quot;https://dev.to/flexdinesh/create-your-developer-landing-page-with-github-pages---42jk&quot;&gt;Create your developer landing page with GitHub Pages&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;HackerNoon - &lt;a href=&quot;https://hackernoon.com/create-your-developer-landing-page-with-github-pages-70c89b40d052&quot;&gt;Create your developer landing page with GitHub Pages&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;codeburst - &lt;a href=&quot;https://codeburst.io/create-your-developer-landing-page-with-github-pages-791c19227b30&quot;&gt;Create your developer landing page with GitHub Pages&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;It has been featured in —&lt;/p&gt;
+&lt;p&gt;DEV - &lt;a href=&quot;https://dev.to/thepracticaldev/the-7-most-popular-dev-posts-from-the-past-week--56ho&quot;&gt;The 7 Most Popular DEV Posts from the Past Week&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;daily-now - &lt;a href=&quot;https://medium.com/daily-now/most-popular-development-posts-of-the-week-14-mar-2018-b10c1b746325&quot;&gt;Most Popular Development Posts Of The Week (14 Mar 2018)&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;codeburst - &lt;a href=&quot;https://codeburst.io/top-web-software-development-articles-march-15-2018-3874e5effcaa&quot;&gt;Top Web &amp;#x26; Software Development Articles — March 15, 2018&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;DEV - &lt;a href=&quot;https://dev.to/joncassdev/the-shoemakers-children-a-developer-allegory--65g&quot;&gt; The Shoemaker&apos;s Children: A Developer Allegory&lt;/a&gt;&lt;/p&gt;
+&lt;hr&gt;
+&lt;p&gt;&lt;img src=&quot;https://image.ibb.co/jrzpdS/dev_landing_thumb.png&quot; alt=&quot;Developer Landing Page with GitHub Pages&quot;&gt;&lt;/p&gt;
+&lt;p&gt;&lt;em&gt;All of us devs, at one point or other, would have wanted to have a personal website of our own, either to showcase our online presence or just &apos;coz it&apos;s fun. So here, I present you a ready-made &lt;strong&gt;&lt;a href=&quot;https://github.com/flexdinesh/dev-landing-page&quot;&gt;Developer Landing Page&lt;/a&gt;&lt;/strong&gt;&lt;/em&gt;&lt;/p&gt;
+&lt;p&gt;Usually creating a personal website would involve buying/registering a domain name, finding a free/paid hosting service, developing your site and uploading it to the hosting provider.&lt;/p&gt;
+&lt;p&gt;But with &lt;a href=&quot;https://pages.github.com/&quot;&gt;GitHub Pages&lt;/a&gt;, publishing your site is as easy as drinking a coffee.&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;You need a GitHub account (you obviously have one already)&lt;/li&gt;
+&lt;li&gt;Create a new repo with the name &lt;code&gt;{username}.github.io&lt;/code&gt;&lt;/li&gt;
+&lt;li&gt;Clone the repo and create an &lt;code&gt;index.html&lt;/code&gt; file&lt;/li&gt;
+&lt;li&gt;Add some content and &lt;code&gt;git push&lt;/code&gt;&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;Voila! Your site should be live at &lt;code&gt;https://{username}.github.io&lt;/code&gt; in seconds.&lt;/p&gt;
+&lt;h2&gt;Developer Landing Page&lt;/h2&gt;
+&lt;p&gt;I wanted a &lt;strong&gt;Dev Landing Page&lt;/strong&gt; to showcase everything I do online. And I wanted it to be &lt;strong&gt;minimal&lt;/strong&gt; and right to the point rather than beautiful and hefty. So I sat down one night and created this &lt;strong&gt;&lt;a href=&quot;https://github.com/flexdinesh/dev-landing-page&quot;&gt;Dev Landing Page&lt;/a&gt;&lt;/strong&gt;.&lt;/p&gt;
+&lt;p&gt;Few of my friends liked it and I created the same in a few different themes for them.
+And I think for most of the devs out there would like to have something similar. So if you&apos;re not looking for something fancy and like this minimal &lt;strong&gt;&lt;a href=&quot;https://github.com/flexdinesh/dev-landing-page&quot;&gt;Dev Landing Page&lt;/a&gt;&lt;/strong&gt;, feel free to fork/clone and customize it to your dev taste.&lt;/p&gt;
+&lt;p&gt;You can pick from one of these &lt;strong&gt;9 material themes&lt;/strong&gt; or change the colors it to suit your taste &apos;coz it&apos;s just too easy.&lt;/p&gt;
+&lt;p&gt;&lt;img src=&quot;https://image.ibb.co/jJVKCn/dev_landing_page_themes.jpg&quot; alt=&quot;9 Material Themes&quot;&gt;&lt;/p&gt;
+&lt;p&gt;Here&apos;s my &lt;strong&gt;&lt;a href=&quot;https://flexdinesh.github.io&quot;&gt;Dev Landing Page - Dinesh&lt;/a&gt;&lt;/strong&gt;, shining bright in my favourite yellow! 🎉&lt;/p&gt;
+&lt;p&gt;You are amazing! Have a great day! ✨&lt;/p&gt;</content:encoded></item><item><title><![CDATA[How I got started with Open-Source]]></title><description><![CDATA[This article is also cross-posted in — DEV - How I got started with Open-Source TLDR: I started with documentation instead of waiting for…]]></description><link>https://dineshpandiyan.com/how-i-got-started-with-open-source/</link><guid isPermaLink="false">https://dineshpandiyan.com/how-i-got-started-with-open-source/</guid><pubDate>Sun, 04 Feb 2018 00:00:00 GMT</pubDate><content:encoded>&lt;p&gt;This article is also cross-posted in —&lt;/p&gt;
+&lt;p&gt;DEV - &lt;a href=&quot;https://dev.to/flexdinesh/how-i-got-started-with-open-source--882&quot;&gt;How I got started with Open-Source&lt;/a&gt;&lt;/p&gt;
+&lt;hr&gt;
+&lt;p&gt;&lt;em&gt;TLDR: I started with documentation instead of waiting for some big idea to get started.&lt;/em&gt;&lt;/p&gt;
+&lt;p&gt;As most developers, I have also been wanting to get started with Open-Source for almost two years with no progress. I went through all star Open-Source GitHub accounts like &lt;a href=&quot;https://github.com/sindresorhus&quot;&gt;Sindre Sorhus&lt;/a&gt;, browsed through all the tweets and Twitter handles of great developers but was never able to figure out where to get started.&lt;/p&gt;
+&lt;p&gt;Then one day I saw this &lt;a href=&quot;https://github.com/k88hudson/git-flight-rules&quot;&gt;git-flight-rules&lt;/a&gt; repo featured in GitHub explore of the week newsletter email. The repo seemed pretty new and it was around the same time when I was exploring a lot on how to use git effectively to improve productivity. The repo is a curation of frequently used git commands in the form of documentation. &lt;/p&gt;
+&lt;p&gt;It started as &lt;em&gt;&apos;Why not? Let&apos;s add what we learned to that repo&apos;&lt;/em&gt;.&lt;/p&gt;
+&lt;p&gt;I forked the repo and added a few topics on using &lt;code&gt;git stash&lt;/code&gt; effectively and created a PR (Pull Request). The repo maintainer accepted the PR and sent a note of thanks for the contribution. The sense of satisfaction I got after that couldn&apos;t be put into words. I made a few more commits in the following days, and a few weeks later I became one of the &lt;strong&gt;top 5 contributors&lt;/strong&gt; to the repo. The repo now has over &lt;strong&gt;19k stars&lt;/strong&gt; and &lt;strong&gt;1k forks&lt;/strong&gt; in GitHub.&lt;/p&gt;
+&lt;p&gt;So if you want to get started with Open-Source&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Don&apos;t wait for the perfect opportunity. Just pick something from your knowledge base and get started.&lt;/li&gt;
+&lt;li&gt;What you contribute to doesn&apos;t matter as long as you get a sense of satisfaction in doing it. It doesn&apos;t necessarily have to be a ground-breaking ML algorithm, it can be as simple as a curated set of git commands too.&lt;/li&gt;
+&lt;li&gt;Follow the GitHub explore of the week newsletter to keep tabs on interesting repos. &lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;Since then I have contributed to a few repos and have three npm packages under my belt. I&apos;ll be writing about the npm packages in the following posts.&lt;/p&gt;</content:encoded></item></channel></rss>
