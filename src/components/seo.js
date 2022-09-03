@@ -23,6 +23,11 @@ function SEO({ description, lang, meta, keywords, title, canonicalURL: canonical
                 : []
             }
             meta={[
+              // Because this is an archived website
+              {
+                name: `robots`,
+                content: 'noindex,nofollow',
+              },           
               {
                 name: `description`,
                 content: metaDescription,
